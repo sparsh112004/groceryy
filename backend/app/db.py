@@ -57,3 +57,17 @@ def get_database() -> AsyncIOMotorDatabase:
     if db_manager.db is None:
         raise RuntimeError("Database connection has not been initialized.")
     return db_manager.db
+
+
+async def init_db_indexes() -> None:
+    """
+    Ensure required unique and query indexes exist in MongoDB collections on startup.
+    This operation is idempotent (MongoDB avoids recreating existing matching indexes).
+    """
+    if db_manager.db is None:
+        return
+    # Enforce unique constraint on user identifier (email/phone)
+    await db_manager.db.users.create_index("identifier", unique=True)
+    # Enforce unique constraint on household invite codes
+    await db_manager.db.households.create_index("invite_code", unique=True)
+

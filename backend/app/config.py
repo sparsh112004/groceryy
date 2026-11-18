@@ -44,6 +44,17 @@ class Settings:
                 if origin.strip()
             ]
 
+        # JWT configuration
+        jwt_secret_raw = os.getenv("JWT_SECRET")
+        if not jwt_secret_raw or not jwt_secret_raw.strip():
+            raise RuntimeError(
+                "CRITICAL CONFIG ERROR: 'JWT_SECRET' environment variable is missing or empty. "
+                "Please configure JWT_SECRET in your .env file before starting the application."
+            )
+        self.JWT_SECRET: str = jwt_secret_raw.strip()
+        self.JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+        self.JWT_EXPIRE_DAYS: int = int(os.getenv("JWT_EXPIRE_DAYS", "30"))
+
 
 # Instantiate a singleton settings object for import across modules
 settings = Settings()
