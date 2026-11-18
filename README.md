@@ -1,2 +1,4 @@
 # groceryy
-Grocery Management 
+Grocery Management (Household Pantry App)
+
+> **Note:** Direct credential authentication is used in Phase 1 (no OTP or verification). Note that there is no PIN / password reset feature yet.

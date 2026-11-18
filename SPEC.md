@@ -51,9 +51,9 @@ All documents: `_id`, `created_at`, `updated_at`.
 | Collection | Fields |
 |---|---|
 | users | name, identifier (phone or email, unique), secret_hash, household_id |
-| households | name (default "My Kitchen"), invite_code (6 chars, unique), member_ids[] |
+| households | name (default "My Kitchen"), invite_code (6 chars, unique), member_ids[], is_active (bool, default true) |
 | items | household_id, name, expiry_date, status (`active`/`used`/`thrown`), used_at, added_by; optional: quantity, unit, category, location, barcode |
-| shopping_items | household_id, name, quantity (optional), bought (bool), bought_at, added_by |
+| shopping_items | household_id, name, quantity (optional), bought (bool), bought_at, added_by; optional: archived (bool) |
 | events | user_id, household_id, type, meta (object), timestamp |
 
 Do not store expiry status; compute it from `expiry_date` on every read.
@@ -61,8 +61,8 @@ Do not store expiry status; compute it from `expiry_date` on every read.
 ## 6. Business rules
 - Expiry status: `expired` if days_left < 0; `soon` if 0 ≤ days_left ≤ 3; else `fresh`.
 - Use First = active items sorted by expiry_date ascending (expired first), limit 5 on Home.
-- Signup creates a user and a household, links them, returns a JWT (long expiry, about 30 days, to avoid re-login friction).
-- Invite code: 6 uppercase alphanumeric characters, avoid confusing characters (0/O, 1/I). Joining moves the user into that household.
+- Signup creates a user and a household, links them, returns a JWT (long expiry, about 30 days, to avoid re-login friction). Direct credential auth: no OTP or email/phone verification in Phase 1 (no PIN reset in Phase 1).
+- Invite code: 6 uppercase alphanumeric characters, avoid confusing characters (0/O, 1/I). Joining moves the user into that household. The app prompts for confirmation before joining. On join, the joiner's items and shopping items are moved into the new household, and the old household is marked is_active=false (not deleted).
 - Marking an item bought: sets `bought=true`, `bought_at`, and (after the expiry sheet) creates an active item in the pantry.
 - Concurrent edits: last write wins.
 - Every query is filtered by the token's `household_id`.
@@ -70,7 +70,7 @@ Do not store expiry status; compute it from `expiry_date` on every read.
 ## 7. API (prefix `/v1`)
 - `POST /auth/signup`, `POST /auth/login`, `GET /me`
 - `GET /items` (query: `status`, `category`, `q`), `POST /items`, `PATCH /items/{id}`, `POST /items/{id}/use`, `POST /items/{id}/throw`, `GET /items/use-first`
-- `GET /shopping`, `POST /shopping`, `PATCH /shopping/{id}`, `POST /shopping/{id}/bought` (body: expiry_date)
+- `GET /shopping` (query: `bought`; returns both bought and unbought with bought flag, unbought first; supports `?bought=false`), `POST /shopping`, `PATCH /shopping/{id}`, `POST /shopping/{id}/bought` (body: expiry_date)
 - `GET /household`, `POST /household/join` (body: code), `POST /household/regenerate-code`
 - `POST /events`
 - `GET /health`
@@ -84,22 +84,25 @@ Bottom tabs: **Home, Pantry, Shopping, Household**. A "+" floating button on Hom
 - Screens must work with the last cached data when offline (read-only is enough).
 
 ## 9. Folder structure
+Work inside the `groceryy` repo with `SPEC.md` at repo root.
 Backend:
 ```
-app/
-  main.py, config.py, db.py, deps.py        # app setup, env, Mongo, auth dependency
-  modules/auth/ households/ items/ shopping/ events/
-    router.py, schemas.py, service.py       # one folder per feature
+backend/
+  app/
+    main.py, config.py, db.py, deps.py        # app setup, env, Mongo, auth dependency
+    modules/auth/ households/ items/ shopping/ events/
+      router.py, schemas.py, service.py       # one folder per feature
 ```
 Flutter:
 ```
-lib/
-  main.dart, app_theme.dart, router.dart
-  core/            # api client, storage, constants
-  features/auth/ pantry/ shopping/ household/ home/
-    data/ (models, repository)  ui/ (screens, widgets)  state/
+app/
+  lib/
+    main.dart, app_theme.dart, router.dart
+    core/            # api client, storage, constants
+    features/auth/ pantry/ shopping/ household/ home/
+      data/ (models, repository)  ui/ (screens, widgets)  state/
 ```
-One state-management package only (Provider or Riverpod, pick one and stay consistent).
+State management: **Provider** (stay consistent across all features).
 
 ## 10. Events to log
 `app_open`, `signup`, `login`, `item_added`, `item_used`, `item_thrown`, `shopping_added`, `shopping_bought`, `reminder_opened`, `household_joined`, `invite_shared`.
