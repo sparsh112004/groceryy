@@ -1,0 +1,3 @@
+"""
+Pantry Backend Application package.
+"""

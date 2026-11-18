@@ -1,0 +1,59 @@
+"""
+Main FastAPI application entrypoint.
+
+Sets up application lifecycle (startup/shutdown database hooks),
+CORS middleware, and core endpoints including health check.
+"""
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.db import db_manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI.
+    Initializes database connection on startup and closes it on shutdown.
+    """
+    # Connect Motor client on startup
+    db_manager.connect()
+    yield
+    # Close Motor client pool gracefully on shutdown
+    db_manager.close()
+
+
+app = FastAPI(
+    title="Household Pantry API",
+    version="1.0.0",
+    description="Backend API for household food inventory and shopping management.",
+    lifespan=lifespan,
+)
+
+# Configure Cross-Origin Resource Sharing (CORS)
+# If origins is ['*'], allow_credentials cannot be True per the CORS specification.
+is_wildcard = settings.CORS_ORIGINS == ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=not is_wildcard,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/v1/health", tags=["Health"])
+async def health_check():
+    """
+    Health check endpoint.
+    Verifies service status and MongoDB connectivity.
+    """
+    db_alive = await db_manager.ping()
+    return {
+        "status": "ok",
+        "database": "connected" if db_alive else "disconnected",
+        "environment": settings.ENVIRONMENT,
+    }
