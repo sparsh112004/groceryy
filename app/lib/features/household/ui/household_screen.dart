@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:pantry_app/features/auth/state/auth_provider.dart';
 
-/// Household screen placeholder displaying invite code and family members.
+/// Household screen placeholder with a functional Log out action.
 class HouseholdScreen extends StatelessWidget {
   const HouseholdScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final auth = context.watch<AuthProvider>();
+    final user = auth.currentUser;
+    final household = auth.currentHousehold;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,15 +31,31 @@ class HouseholdScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                'Shared Household',
+                household?.name ?? 'Shared Household',
                 style: theme.textTheme.headlineMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
-                'Household details and shared members will appear here.',
+                user != null
+                    ? 'Logged in as ${user.name} (${user.identifier})'
+                    : 'Household details and shared members will appear here.',
                 style: theme.textTheme.bodyMedium,
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              // Simple Log out button per specification
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await context.read<AuthProvider>().logout();
+                },
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(160, 48),
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(color: theme.colorScheme.error),
+                ),
+                icon: const Icon(Icons.logout),
+                label: const Text('Log out'),
               ),
             ],
           ),

@@ -111,7 +111,12 @@ class ApiClient {
     } on SocketException catch (e) {
       throw ApiException(
         statusCode: 0,
-        message: 'Unable to connect to server: ${e.message}',
+        message: 'Cannot reach the server, please try again: ${e.message}',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Cannot reach the server, please try again: ${e.message}',
       );
     }
   }
@@ -130,7 +135,12 @@ class ApiClient {
     } on SocketException catch (e) {
       throw ApiException(
         statusCode: 0,
-        message: 'Unable to connect to server: ${e.message}',
+        message: 'Cannot reach the server, please try again: ${e.message}',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Cannot reach the server, please try again: ${e.message}',
       );
     }
   }
@@ -149,7 +159,12 @@ class ApiClient {
     } on SocketException catch (e) {
       throw ApiException(
         statusCode: 0,
-        message: 'Unable to connect to server: ${e.message}',
+        message: 'Cannot reach the server, please try again: ${e.message}',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Cannot reach the server, please try again: ${e.message}',
       );
     }
   }
@@ -164,7 +179,12 @@ class ApiClient {
     } on SocketException catch (e) {
       throw ApiException(
         statusCode: 0,
-        message: 'Unable to connect to server: ${e.message}',
+        message: 'Cannot reach the server, please try again: ${e.message}',
+      );
+    } on http.ClientException catch (e) {
+      throw ApiException(
+        statusCode: 0,
+        message: 'Cannot reach the server, please try again: ${e.message}',
       );
     }
   }
