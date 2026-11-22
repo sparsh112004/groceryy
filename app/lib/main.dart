@@ -5,6 +5,8 @@ import 'package:pantry_app/core/api_client.dart';
 import 'package:pantry_app/core/storage.dart';
 import 'package:pantry_app/features/auth/state/auth_provider.dart';
 import 'package:pantry_app/features/auth/ui/auth_screen.dart';
+import 'package:pantry_app/features/pantry/data/items_repository.dart';
+import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/router.dart';
 
 void main() {
@@ -33,6 +35,21 @@ class PantryApp extends StatelessWidget {
           ),
           update: (_, apiClient, storage, previous) =>
               previous ?? AuthProvider(apiClient: apiClient, storage: storage),
+        ),
+        ProxyProvider<ApiClient, ItemsRepository>(
+          update: (_, apiClient, _) => ItemsRepository(apiClient: apiClient),
+        ),
+        ChangeNotifierProxyProvider2<ItemsRepository, AuthProvider, ItemsProvider>(
+          create: (ctx) => ItemsProvider(
+            repository: ctx.read<ItemsRepository>(),
+            onUnauthorized: () => ctx.read<AuthProvider>().logout(),
+          ),
+          update: (_, repository, auth, previous) =>
+              previous ??
+              ItemsProvider(
+                repository: repository,
+                onUnauthorized: () => auth.logout(),
+              ),
         ),
       ],
       child: MaterialApp(

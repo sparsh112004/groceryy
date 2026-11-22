@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pantry_app/features/home/ui/home_screen.dart';
 import 'package:pantry_app/features/household/ui/household_screen.dart';
+import 'package:pantry_app/features/pantry/ui/add_item_screen.dart';
 import 'package:pantry_app/features/pantry/ui/pantry_screen.dart';
 import 'package:pantry_app/features/shopping/ui/shopping_screen.dart';
 
@@ -46,10 +47,9 @@ class MainShellScreen extends StatelessWidget {
       floatingActionButton: showFab
           ? FloatingActionButton(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Add Item sheet will be implemented next.'),
-                    duration: Duration(seconds: 2),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AddItemScreen(),
                   ),
                 );
               },
