@@ -8,6 +8,11 @@ import 'package:pantry_app/features/auth/ui/auth_screen.dart';
 import 'package:pantry_app/features/pantry/data/items_repository.dart';
 import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/features/pantry/ui/add_item_screen.dart';
+import 'package:pantry_app/features/shopping/data/shopping_item_model.dart';
+import 'package:pantry_app/features/shopping/data/shopping_repository.dart';
+import 'package:pantry_app/features/shopping/state/shopping_provider.dart';
+import 'package:pantry_app/features/shopping/ui/bought_bottom_sheet.dart';
+import 'package:pantry_app/features/shopping/ui/shopping_screen.dart';
 
 void main() {
   testWidgets('AuthScreen displays welcome message and toggles login/signup',
@@ -115,5 +120,108 @@ void main() {
     // Save button should now be enabled
     final FilledButton enabledButton = tester.widget(saveButtonFinder);
     expect(enabledButton.onPressed, isNotNull);
+  });
+
+  testWidgets('ShoppingScreen renders heading, add field, and shows duplicate hint for pantry match',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final storage = StorageService();
+    final apiClient = ApiClient(storage: storage);
+    final itemsRepo = ItemsRepository(apiClient: apiClient);
+    final itemsProvider = ItemsProvider(repository: itemsRepo);
+    final shoppingRepo = ShoppingRepository(apiClient: apiClient);
+    final shoppingProvider = ShoppingProvider(repository: shoppingRepo);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<ItemsProvider>.value(value: itemsProvider),
+          ChangeNotifierProvider<ShoppingProvider>.value(value: shoppingProvider),
+        ],
+        child: const MaterialApp(
+          home: ShoppingScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Verify Shopping list header and Add to list field
+    expect(find.text('Shopping list'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Add to list'), findsOneWidget);
+
+    // Enter text that does not match pantry
+    await tester.enterText(find.byType(TextField), 'Bread');
+    await tester.pump();
+    expect(find.textContaining('You already have'), findsNothing);
+  });
+
+  testWidgets('BoughtBottomSheet renders quick chips and enables Add to pantry on selection',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final testItem = ShoppingItem(
+      id: 'item_123',
+      householdId: 'hh_456',
+      name: 'Sugar',
+      bought: false,
+      archived: false,
+      addedBy: 'user_789',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    DateTime? confirmedDate;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BoughtBottomSheet(
+            item: testItem,
+            onConfirm: (expiry) async {
+              confirmedDate = expiry;
+              return const MarkBoughtResult(
+                status: MarkBoughtStatus.success,
+                message: 'Sugar added to pantry',
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Verify Wireframe 4 elements
+    expect(find.text('Sugar bought. Add to pantry?'), findsOneWidget);
+    expect(find.text('Expires in'), findsOneWidget);
+    expect(find.text('1 month'), findsOneWidget);
+    expect(find.text('3 months'), findsOneWidget);
+    expect(find.text('6 months'), findsOneWidget);
+    expect(find.text('Pick date'), findsOneWidget);
+
+    // Verify Add to pantry button is initially disabled
+    final buttonFinder = find.widgetWithText(ElevatedButton, 'Add to pantry');
+    expect(buttonFinder, findsOneWidget);
+    ElevatedButton buttonWidget = tester.widget(buttonFinder);
+    expect(buttonWidget.onPressed, isNull);
+
+    // Tap '1 month' chip
+    await tester.tap(find.text('1 month'));
+    await tester.pump();
+
+    // Button should now be enabled
+    buttonWidget = tester.widget(buttonFinder);
+    expect(buttonWidget.onPressed, isNotNull);
+
+    // Tap Add to pantry button
+    await tester.tap(buttonFinder);
+    await tester.pump();
+
+    expect(confirmedDate, isNotNull);
   });
 }

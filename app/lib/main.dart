@@ -7,6 +7,8 @@ import 'package:pantry_app/features/auth/state/auth_provider.dart';
 import 'package:pantry_app/features/auth/ui/auth_screen.dart';
 import 'package:pantry_app/features/pantry/data/items_repository.dart';
 import 'package:pantry_app/features/pantry/state/items_provider.dart';
+import 'package:pantry_app/features/shopping/data/shopping_repository.dart';
+import 'package:pantry_app/features/shopping/state/shopping_provider.dart';
 import 'package:pantry_app/router.dart';
 
 void main() {
@@ -47,6 +49,21 @@ class PantryApp extends StatelessWidget {
           update: (_, repository, auth, previous) =>
               previous ??
               ItemsProvider(
+                repository: repository,
+                onUnauthorized: () => auth.logout(),
+              ),
+        ),
+        ProxyProvider<ApiClient, ShoppingRepository>(
+          update: (_, apiClient, _) => ShoppingRepository(apiClient: apiClient),
+        ),
+        ChangeNotifierProxyProvider2<ShoppingRepository, AuthProvider, ShoppingProvider>(
+          create: (ctx) => ShoppingProvider(
+            repository: ctx.read<ShoppingRepository>(),
+            onUnauthorized: () => ctx.read<AuthProvider>().logout(),
+          ),
+          update: (_, repository, auth, previous) =>
+              previous ??
+              ShoppingProvider(
                 repository: repository,
                 onUnauthorized: () => auth.logout(),
               ),
