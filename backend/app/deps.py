@@ -97,8 +97,16 @@ async def get_current_auth(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Use the household_id associated with the user record, or fallback to token
-    current_household_id = str(user.get("household_id", household_id_from_token))
+    # IMPORTANT: Ensure household_id comes from the user's current live database record
+    # so an old token cannot keep pointing to a household the user has left.
+    user_household_id = user.get("household_id")
+    if not user_household_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not currently assigned to any household.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    current_household_id = str(user_household_id)
 
     return AuthenticatedUser(user=user, household_id=current_household_id)
 

@@ -141,3 +141,26 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
       ```
     - Atomically marks the shopping item `bought=true` (`bought_at=now`) and automatically creates a new active pantry item with computed `days_left` and `expiry_status`.
     - If already bought, returns `409 Conflict` and prevents creating duplicate pantry entries.
+15. **Get Household Details (`GET /v1/household`):**
+    - Returns current household info: `id`, `name`, `invite_code`, `is_active`, and safe member list (`id` and `name` only).
+16. **Join Household (`POST /v1/household/join`):**
+    - Join another household via 6-character invite code:
+      ```json
+      {
+        "code": "ABC234"
+      }
+      ```
+    - Rate limited to 10 attempts per hour per user.
+    - If the user was the sole member of their old household, all pantry items and shopping items are automatically migrated to the new household, and the old household is marked `is_active=false`.
+    - Returns a fresh 30-day JWT token with the new `household_id`.
+17. **Regenerate Invite Code (`POST /v1/household/regenerate-code`):**
+    - Invalidate the current code and generate a new unique 6-character code immediately.
+18. **Log Application Event (`POST /v1/events`):**
+    - Record product telemetry (allowed types: `app_open`, `signup`, `login`, `item_added`, `item_used`, `item_thrown`, `shopping_added`, `shopping_bought`, `reminder_opened`, `household_joined`, `invite_shared`):
+      ```json
+      {
+        "type": "item_added",
+        "meta": { "category": "Dairy" }
+      }
+      ```
+    - Metadata is limited to 2 KB. Server injects `user_id`, `household_id`, and UTC timestamp.

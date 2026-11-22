@@ -78,4 +78,11 @@ async def init_db_indexes() -> None:
     await db_manager.db.shopping_items.create_index(
         [("household_id", 1), ("bought", 1), ("created_at", 1)]
     )
+    # Indexes on events for household and user telemetry queries
+    await db_manager.db.events.create_index(
+        [("household_id", 1), ("timestamp", -1)]
+    )
+    await db_manager.db.events.create_index(
+        [("user_id", 1), ("timestamp", -1)]
+    )
 
