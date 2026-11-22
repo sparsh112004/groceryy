@@ -26,7 +26,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                'Welcome to Pantry',
+                'Welcome to Stockora',
                 style: theme.textTheme.headlineMedium,
                 textAlign: TextAlign.center,
               ),

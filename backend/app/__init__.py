@@ -1,3 +1,3 @@
 """
-Pantry Backend Application package.
+Stockora Backend Application package.
 """

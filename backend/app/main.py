@@ -35,9 +35,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Household Pantry API",
+    title="Stockora API",
     version="1.0.0",
-    description="Backend API for household food inventory and shopping management.",
+    description="Backend API for Stockora household food inventory and shopping management.",
     lifespan=lifespan,
 )
 

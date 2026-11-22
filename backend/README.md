@@ -1,6 +1,6 @@
-# Pantry Backend API
+# Stockora Backend API
 
-FastAPI backend service for the Household Pantry app ("Pantry").
+FastAPI backend service for the Stockora household inventory app.
 
 ## Stack
 - **Framework:** FastAPI

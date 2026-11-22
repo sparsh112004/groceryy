@@ -1,6 +1,6 @@
-# Pantry App (Frontend)
+# Stockora App (Frontend)
 
-Flutter mobile and web frontend for the Household Pantry app ("Pantry").
+Flutter mobile and web frontend for the Stockora household inventory app.
 
 ## Stack & Target Platforms
 - **Framework:** Flutter (Dart) with Material 3 design

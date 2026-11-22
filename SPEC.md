@@ -1,4 +1,4 @@
-# SPEC.md — Household Pantry App (working name: "Pantry")
+# SPEC.md — Stockora (Household Pantry App)
 
 Read this file fully before writing any code. If a request conflicts with this spec, say so instead of silently deviating.
 

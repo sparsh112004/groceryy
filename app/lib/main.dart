@@ -10,7 +10,7 @@ void main() {
   runApp(const PantryApp());
 }
 
-/// Root widget of the Pantry application.
+/// Root widget of the Stockora application.
 /// Configures dependency injection via Provider, Material 3 theme, and English-only UI.
 class PantryApp extends StatelessWidget {
   const PantryApp({super.key});
@@ -26,7 +26,7 @@ class PantryApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Pantry',
+        title: 'Stockora',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         home: const MainShellScreen(),
