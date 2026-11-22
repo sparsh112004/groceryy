@@ -115,3 +115,29 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
    - Modify fields such as `name`, `expiry_date`, `location`, or `quantity`.
 10. **Mark Item Used or Thrown (`POST /v1/items/{id}/use` / `POST /v1/items/{id}/throw`):**
     - Soft-deletes item by updating `status` and `used_at` timestamp. Cross-household access or invalid IDs safely return `404 Not Found`.
+11. **Add Shopping Item (`POST /v1/shopping`):**
+    - Add an item to the shopping list:
+      ```json
+      {
+        "name": "Eggs",
+        "quantity": 12
+      }
+      ```
+    - Initializes with `bought=false` and `archived=false`.
+12. **List Shopping Items (`GET /v1/shopping`):**
+    - Returns unbought items first (newest `created_at` first), followed by bought items (most recently `bought_at` first).
+    - Supports `?bought=false` to fetch only unbought items.
+    - Excludes archived items by default (`include_archived=false`).
+13. **Update Shopping Item (`PATCH /v1/shopping/{id}`):**
+    - Update mutable fields (`name`, `quantity`, `archived`). Prevents altering `household_id`, `bought`, or `added_by`.
+14. **Mark Shopping Item Bought (`POST /v1/shopping/{id}/bought`):**
+    - Supply expiration date and optional storage parameters:
+      ```json
+      {
+        "expiry_date": "2026-11-30",
+        "category": "Dairy",
+        "location": "Fridge"
+      }
+      ```
+    - Atomically marks the shopping item `bought=true` (`bought_at=now`) and automatically creates a new active pantry item with computed `days_left` and `expiry_status`.
+    - If already bought, returns `409 Conflict` and prevents creating duplicate pantry entries.

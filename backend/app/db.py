@@ -74,4 +74,8 @@ async def init_db_indexes() -> None:
     await db_manager.db.items.create_index(
         [("household_id", 1), ("status", 1), ("expiry_date", 1)]
     )
+    # Compound index on shopping_items for household bought status and chronological sorting
+    await db_manager.db.shopping_items.create_index(
+        [("household_id", 1), ("bought", 1), ("created_at", 1)]
+    )
 
