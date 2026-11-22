@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db import db_manager, init_db_indexes
 from app.modules.auth.router import router as auth_router
+from app.modules.items.router import router as items_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ app.add_middleware(
 
 # Register API routers with /v1 prefix
 app.include_router(auth_router, prefix="/v1")
+app.include_router(items_router, prefix="/v1")
 
 
 @app.get("/v1/health", tags=["Health"])

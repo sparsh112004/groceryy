@@ -70,4 +70,8 @@ async def init_db_indexes() -> None:
     await db_manager.db.users.create_index("identifier", unique=True)
     # Enforce unique constraint on household invite codes
     await db_manager.db.households.create_index("invite_code", unique=True)
+    # Compound index on items for fast household status and expiry sorting
+    await db_manager.db.items.create_index(
+        [("household_id", 1), ("status", 1), ("expiry_date", 1)]
+    )
 

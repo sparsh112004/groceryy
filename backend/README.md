@@ -93,3 +93,25 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
    - Verifies the JWT Bearer token and returns the current user profile along with their household and invite code.
 5. **Login (`POST /v1/auth/login`):**
    - Authenticate with `identifier` and `secret`. Returns a new JWT token.
+6. **Add Pantry Item (`POST /v1/items`):**
+   - Add food items with required `name` and `expiry_date` (`YYYY-MM-DD`):
+     ```json
+     {
+       "name": "Organic Whole Milk",
+       "expiry_date": "2026-11-20",
+       "quantity": 1,
+       "unit": "carton",
+       "category": "Dairy",
+       "location": "Fridge"
+     }
+     ```
+   - Notice the computed fields returned: `days_left` and `expiry_status` (`"fresh"`, `"soon"`, or `"expired"`).
+7. **Use First Items (`GET /v1/items/use-first`):**
+   - Retrieves up to 5 active items that expire soonest (or are already expired) to prioritize consumption on the Home screen.
+8. **List Items (`GET /v1/items`):**
+   - Filters by `status` (`active`, `used`, `thrown`, or `all`), `category` (e.g., `Dairy`), and `q` (case-insensitive text search like `milk`).
+   - Results are automatically sorted ascending by expiration date.
+9. **Update Item (`PATCH /v1/items/{id}`):**
+   - Modify fields such as `name`, `expiry_date`, `location`, or `quantity`.
+10. **Mark Item Used or Thrown (`POST /v1/items/{id}/use` / `POST /v1/items/{id}/throw`):**
+    - Soft-deletes item by updating `status` and `used_at` timestamp. Cross-household access or invalid IDs safely return `404 Not Found`.
