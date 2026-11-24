@@ -53,8 +53,8 @@ class HouseholdProvider extends ChangeNotifier {
   }
 
   /// Joins a household using an invite code.
-  /// Returns true on success, false otherwise.
-  Future<bool> join(String code) async {
+  /// Returns the new access token on success, or null on failure (errorMessage is set).
+  Future<String?> join(String code) async {
     _isSubmitting = true;
     _errorMessage = null;
     notifyListeners();
@@ -64,7 +64,7 @@ class HouseholdProvider extends ChangeNotifier {
       _household = result['household'] as HouseholdModel? ?? _household;
       _isSubmitting = false;
       notifyListeners();
-      return true;
+      return result['accessToken'] as String?;
     } on ApiException catch (e) {
       _isSubmitting = false;
       if (e.statusCode == 401) {
@@ -73,12 +73,12 @@ class HouseholdProvider extends ChangeNotifier {
         _errorMessage = e.message;
         notifyListeners();
       }
-      return false;
+      return null;
     } catch (_) {
       _isSubmitting = false;
       _errorMessage = 'Failed to join household.';
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

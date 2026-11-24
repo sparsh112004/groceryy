@@ -14,6 +14,8 @@ enum AuthStatus {
 
 /// State provider managing authentication lifecycle, tokens, and active profile.
 class AuthProvider extends ChangeNotifier {
+  // Existing fields and methods...
+
   final ApiClient _apiClient;
   final StorageService _storage;
 
@@ -248,7 +250,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clears any transient error message.
+  /// Saves a new access token and updates the provider state.
+  Future<void> saveNewAccessToken(String token) async {
+    await _storage.saveAuthToken(token);
+    _token = token;
+    // Optionally, we could refresh profile info, but caller will handle reloads.
+    notifyListeners();
+  }
+
   void clearError() {
     if (_errorMessage != null) {
       _errorMessage = null;
