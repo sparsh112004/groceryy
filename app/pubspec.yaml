@@ -43,6 +43,11 @@ dependencies:
   # Secure token storage (Android keychain/keystore + web local fallback)
   flutter_secure_storage: ^9.2.2
 
+  # Scheduled local notifications
+  flutter_local_notifications: ^18.0.0
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
