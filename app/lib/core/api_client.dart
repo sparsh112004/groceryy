@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:pantry_app/core/constants.dart';
 import 'package:pantry_app/core/storage.dart';
@@ -25,6 +25,8 @@ class ApiException implements Exception {
 /// - Automatically injects Bearer token in the Authorization header
 /// - Provides centralized JSON decoding and error handling
 class ApiClient {
+  static const Duration _timeout = Duration(seconds: 12);
+
   final http.Client _httpClient;
   final StorageService _storage;
   final String baseUrl;
@@ -53,6 +55,18 @@ class ApiClient {
       headers.addAll(extra);
     }
     return headers;
+  }
+
+  /// Converts any network-layer error into a friendly [ApiException].
+  /// In debug mode the full URL and underlying error are printed.
+  Never _handleNetworkError(Uri uri, Object error) {
+    if (kDebugMode) {
+      debugPrint('[ApiClient] Request to ${uri.toString()} failed: $error');
+    }
+    throw ApiException(
+      statusCode: 0,
+      message: 'Cannot reach the server, please try again.',
+    );
   }
 
   Uri _buildUri(String path, [Map<String, dynamic>? queryParams]) {
@@ -103,89 +117,65 @@ class ApiClient {
 
   /// Sends a GET request.
   Future<dynamic> get(String path, {Map<String, dynamic>? queryParams}) async {
+    final uri = _buildUri(path, queryParams);
     try {
-      final uri = _buildUri(path, queryParams);
       final headers = await _buildHeaders();
-      final response = await _httpClient.get(uri, headers: headers);
+      final response = await _httpClient
+          .get(uri, headers: headers)
+          .timeout(_timeout);
       return _processResponse(response);
-    } on SocketException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
-    } on http.ClientException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _handleNetworkError(uri, e);
     }
   }
 
   /// Sends a POST request.
   Future<dynamic> post(String path, {dynamic body}) async {
+    final uri = _buildUri(path);
     try {
-      final uri = _buildUri(path);
       final headers = await _buildHeaders();
-      final response = await _httpClient.post(
-        uri,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .post(uri, headers: headers, body: body != null ? jsonEncode(body) : null)
+          .timeout(_timeout);
       return _processResponse(response);
-    } on SocketException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
-    } on http.ClientException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _handleNetworkError(uri, e);
     }
   }
 
   /// Sends a PATCH request.
   Future<dynamic> patch(String path, {dynamic body}) async {
+    final uri = _buildUri(path);
     try {
-      final uri = _buildUri(path);
       final headers = await _buildHeaders();
-      final response = await _httpClient.patch(
-        uri,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .patch(uri, headers: headers, body: body != null ? jsonEncode(body) : null)
+          .timeout(_timeout);
       return _processResponse(response);
-    } on SocketException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
-    } on http.ClientException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _handleNetworkError(uri, e);
     }
   }
 
   /// Sends a DELETE request.
   Future<dynamic> delete(String path) async {
+    final uri = _buildUri(path);
     try {
-      final uri = _buildUri(path);
       final headers = await _buildHeaders();
-      final response = await _httpClient.delete(uri, headers: headers);
+      final response = await _httpClient
+          .delete(uri, headers: headers)
+          .timeout(_timeout);
       return _processResponse(response);
-    } on SocketException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
-    } on http.ClientException catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Cannot reach the server, please try again: ${e.message}',
-      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      _handleNetworkError(uri, e);
     }
   }
 }

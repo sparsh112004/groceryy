@@ -1,7 +1,6 @@
 // Imports
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, FilteringTextInputFormatter;
 import 'package:provider/provider.dart';
 
 import 'package:pantry_app/core/api_client.dart';
@@ -192,20 +191,23 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
                   Text('Hello, ${user.name}', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 12),
                 ],
-                Card(
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          household?.name ?? 'Household',
-                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('Shared pantry'),
-                      ],
+                SizedBox(
+                  width: double.infinity,
+                  child: Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            household?.name ?? 'Household',
+                            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('Shared pantry'),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -219,7 +221,12 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
                       padding: const EdgeInsets.all(12.0),
                       child: Column(
                         children: household!.members
-                            .map((m) => ListTile(contentPadding: EdgeInsets.zero, title: Text(m.name, style: theme.textTheme.bodyMedium)))
+                            .map((m) => ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  dense: true,
+                                  visualDensity: VisualDensity.compact,
+                                  title: Text(m.name, style: theme.textTheme.bodyLarge),
+                                ))
                             .toList(),
                       ),
                     ),
@@ -234,30 +241,60 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
                     elevation: 1,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Large code on its own line.
                           Text(
                             household!.inviteCode,
-                            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 4,
+                            ),
                           ),
+                          const SizedBox(height: 12),
+                          // Copy + New code buttons, each taking half the width.
                           Row(
                             children: [
-                              ElevatedButton(
-                                onPressed: provider.isSubmitting ? null : _regenerateCode,
-                                style: ElevatedButton.styleFrom(minimumSize: const Size(80, 48)),
-                                child: const Text('New code'),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: provider.isSubmitting
+                                      ? null
+                                      : () {
+                                          // Copy invite code to clipboard.
+                                          final data = ClipboardData(text: household.inviteCode);
+                                          Clipboard.setData(data);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Invite code copied')),
+                                          );
+                                        },
+                                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                                  icon: const Icon(Icons.copy, size: 18),
+                                  label: const Text('Copy', style: TextStyle(fontSize: 16)),
+                                ),
                               ),
                               const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: provider.isSubmitting ? null : _joinHousehold,
-                                style: ElevatedButton.styleFrom(minimumSize: const Size(180, 48)),
-                                child: const Text('Join another household'),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: provider.isSubmitting ? null : _regenerateCode,
+                                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                                  child: const Text('New code', style: TextStyle(fontSize: 16)),
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Join another household — full-width below the card.
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: provider.isSubmitting ? null : _joinHousehold,
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                      child: const Text('Join another household', style: TextStyle(fontSize: 16)),
                     ),
                   ),
                   const SizedBox(height: 24),
