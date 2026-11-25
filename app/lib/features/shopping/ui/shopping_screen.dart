@@ -6,6 +6,7 @@ import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/features/shopping/data/shopping_item_model.dart';
 import 'package:pantry_app/features/shopping/state/shopping_provider.dart';
 import 'package:pantry_app/features/shopping/ui/add_shopping_item_sheet.dart';
+import 'package:pantry_app/features/shopping/ui/add_to_pantry_flow_screen.dart';
 import 'package:pantry_app/features/shopping/ui/shopping_receipt_screen.dart';
 
 /// Shopping list screen:
@@ -122,6 +123,28 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         );
       }
     }
+  }
+
+  Future<void> _openAddToPantryFlow() async {
+    final addedCount = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) => const AddToPantryFlowScreen(),
+      ),
+    );
+
+    if (!mounted || addedCount == null || addedCount <= 0) return;
+
+    final label = addedCount == 1
+        ? '1 item added to pantry'
+        : '$addedCount items added to pantry';
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(label),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _archiveItem(ShoppingItem item) async {
@@ -528,6 +551,37 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                 },
               ),
             ),
+
+            if (unbought.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+                ),
+                child: SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _openAddToPantryFlow,
+                    icon: const Icon(Icons.kitchen_outlined, size: 22),
+                    label: const Text(
+                      'I am back: Add to pantry',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

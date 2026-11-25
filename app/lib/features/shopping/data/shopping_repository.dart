@@ -105,4 +105,97 @@ class ShoppingRepository {
         await _apiClient.post('/v1/shopping/$id/bought', body: body);
     return response as Map<String, dynamic>;
   }
+
+  /// Marks multiple shopping items as bought in one bulk request.
+  Future<List<BulkBoughtResultItem>> markBoughtBulk(
+    List<BulkBoughtItemInput> items,
+  ) async {
+    final body = <String, dynamic>{
+      'items': items.map((item) => item.toJson()).toList(),
+    };
+
+    final response =
+        await _apiClient.post('/v1/shopping/bought-bulk', body: body);
+    if (response is Map<String, dynamic>) {
+      final rawResults = response['results'];
+      if (rawResults is List) {
+        return rawResults
+            .whereType<Map<String, dynamic>>()
+            .map(BulkBoughtResultItem.fromJson)
+            .toList();
+      }
+    }
+    return const [];
+  }
+}
+
+/// Request payload for a single item in POST /v1/shopping/bought-bulk.
+class BulkBoughtItemInput {
+  final String id;
+  final DateTime expiryDate;
+  final double? quantity;
+  final String? unit;
+  final String? category;
+  final String? location;
+
+  const BulkBoughtItemInput({
+    required this.id,
+    required this.expiryDate,
+    this.quantity,
+    this.unit,
+    this.category,
+    this.location,
+  });
+
+  Map<String, dynamic> toJson() {
+    final formattedDate =
+        '${expiryDate.year.toString().padLeft(4, '0')}-${expiryDate.month.toString().padLeft(2, '0')}-${expiryDate.day.toString().padLeft(2, '0')}';
+
+    return <String, dynamic>{
+      'id': id,
+      'expiry_date': formattedDate,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null && unit!.trim().isNotEmpty) 'unit': unit!.trim(),
+      if (category != null && category!.trim().isNotEmpty)
+        'category': category!.trim(),
+      if (location != null && location!.trim().isNotEmpty)
+        'location': location!.trim(),
+    };
+  }
+}
+
+/// Per-item result returned by POST /v1/shopping/bought-bulk.
+class BulkBoughtResultItem {
+  final String id;
+  final String status;
+  final String code;
+  final String message;
+  final Map<String, dynamic>? shoppingItem;
+  final Map<String, dynamic>? pantryItem;
+
+  const BulkBoughtResultItem({
+    required this.id,
+    required this.status,
+    required this.code,
+    required this.message,
+    this.shoppingItem,
+    this.pantryItem,
+  });
+
+  bool get isOk => status == 'ok';
+
+  factory BulkBoughtResultItem.fromJson(Map<String, dynamic> json) {
+    return BulkBoughtResultItem(
+      id: json['id']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'error',
+      code: json['code']?.toString() ?? '',
+      message: json['message']?.toString() ?? 'Failed to add item to pantry.',
+      shoppingItem: json['shopping_item'] is Map
+          ? Map<String, dynamic>.from(json['shopping_item'] as Map)
+          : null,
+      pantryItem: json['pantry_item'] is Map
+          ? Map<String, dynamic>.from(json['pantry_item'] as Map)
+          : null,
+    );
+  }
 }

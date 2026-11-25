@@ -21,12 +21,34 @@ class MarkBoughtResult {
   });
 }
 
+/// Result returned from a bulk mark-bought request.
+class BulkBoughtOutcome {
+  final List<BulkBoughtResultItem> results;
+  final String? errorMessage;
+  final bool unauthorized;
+
+  const BulkBoughtOutcome({
+    this.results = const [],
+    this.errorMessage,
+    this.unauthorized = false,
+  });
+
+  List<BulkBoughtResultItem> get succeeded =>
+      results.where((r) => r.isOk).toList();
+
+  List<BulkBoughtResultItem> get failed =>
+      results.where((r) => !r.isOk).toList();
+
+  bool get hasRequestError => errorMessage != null || unauthorized;
+}
+
 /// Provider managing shopping list items, local picked state, and archiving.
 class ShoppingProvider extends ChangeNotifier {
   final ShoppingRepository _repository;
   final VoidCallback? _onUnauthorized;
 
   bool _isLoading = false;
+  bool _isBulkSubmitting = false;
   String? _errorMessage;
   List<ShoppingItem> _items = [];
   final Set<String> _processingItemIds = {};
@@ -40,6 +62,7 @@ class ShoppingProvider extends ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
+  bool get isBulkSubmitting => _isBulkSubmitting;
   String? get errorMessage => _errorMessage;
   List<ShoppingItem> get items => _items;
   Set<String> get pickedItemIds => Set.unmodifiable(_pickedItemIds);
@@ -262,6 +285,56 @@ class ShoppingProvider extends ChangeNotifier {
       );
     } finally {
       _processingItemIds.remove(id);
+      notifyListeners();
+    }
+  }
+
+  /// Marks multiple shopping items as bought in one bulk request.
+  /// Prevents double-taps, reloads shopping items when any item succeeds,
+  /// and triggers logout on 401.
+  Future<BulkBoughtOutcome> markItemsBoughtBulk(
+    List<BulkBoughtItemInput> items,
+  ) async {
+    if (_isBulkSubmitting) {
+      return const BulkBoughtOutcome(
+        errorMessage: 'Submission already in progress.',
+      );
+    }
+
+    _isBulkSubmitting = true;
+    notifyListeners();
+
+    try {
+      final results = await _repository.markBoughtBulk(items);
+      final succeededIds =
+          results.where((r) => r.isOk).map((r) => r.id).toSet();
+
+      if (succeededIds.isNotEmpty) {
+        _pickedItemIds.removeAll(succeededIds);
+        await loadItems();
+      }
+
+      return BulkBoughtOutcome(results: results);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        _onUnauthorized?.call();
+        return const BulkBoughtOutcome(
+          unauthorized: true,
+          errorMessage: 'Session expired. Please log in again.',
+        );
+      }
+      if (e.statusCode == 0) {
+        return const BulkBoughtOutcome(
+          errorMessage: 'Cannot reach the server, please try again.',
+        );
+      }
+      return BulkBoughtOutcome(errorMessage: e.message);
+    } catch (_) {
+      return const BulkBoughtOutcome(
+        errorMessage: 'Failed to add items to pantry. Please try again.',
+      );
+    } finally {
+      _isBulkSubmitting = false;
       notifyListeners();
     }
   }
