@@ -20,7 +20,8 @@ class ShoppingRepository {
       queryParams['include_archived'] = 'true';
     }
 
-    final response = await _apiClient.get('/v1/shopping', queryParams: queryParams);
+    final response =
+        await _apiClient.get('/v1/shopping', queryParams: queryParams);
     if (response is List) {
       return response
           .map((e) => ShoppingItem.fromJson(e as Map<String, dynamic>))
@@ -30,12 +31,23 @@ class ShoppingRepository {
   }
 
   /// Adds a new item to the shopping list.
-  Future<ShoppingItem> addShoppingItem(String name, {double? quantity}) async {
+  Future<ShoppingItem> addShoppingItem(
+    String name, {
+    double? quantity,
+    String? unit,
+    String? category,
+  }) async {
     final body = <String, dynamic>{
       'name': name.trim(),
     };
     if (quantity != null) {
       body['quantity'] = quantity;
+    }
+    if (unit != null && unit.trim().isNotEmpty) {
+      body['unit'] = unit.trim();
+    }
+    if (category != null && category.trim().isNotEmpty) {
+      body['category'] = category.trim();
     }
 
     final response = await _apiClient.post('/v1/shopping', body: body);
@@ -47,11 +59,17 @@ class ShoppingRepository {
     String id, {
     String? name,
     double? quantity,
+    String? unit,
+    String? category,
     bool? archived,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name.trim();
     if (quantity != null) body['quantity'] = quantity;
+    if (unit != null && unit.trim().isNotEmpty) body['unit'] = unit.trim();
+    if (category != null && category.trim().isNotEmpty) {
+      body['category'] = category.trim();
+    }
     if (archived != null) body['archived'] = archived;
 
     final response = await _apiClient.patch('/v1/shopping/$id', body: body);
@@ -83,7 +101,8 @@ class ShoppingRepository {
       body['location'] = location.trim();
     }
 
-    final response = await _apiClient.post('/v1/shopping/$id/bought', body: body);
+    final response =
+        await _apiClient.post('/v1/shopping/$id/bought', body: body);
     return response as Map<String, dynamic>;
   }
 }

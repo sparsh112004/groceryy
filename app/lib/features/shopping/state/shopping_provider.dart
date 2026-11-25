@@ -21,7 +21,7 @@ class MarkBoughtResult {
   });
 }
 
-/// Provider managing shopping list items, addition, and transition to pantry.
+/// Provider managing shopping list items, local picked state, and archiving.
 class ShoppingProvider extends ChangeNotifier {
   final ShoppingRepository _repository;
   final VoidCallback? _onUnauthorized;
@@ -30,6 +30,7 @@ class ShoppingProvider extends ChangeNotifier {
   String? _errorMessage;
   List<ShoppingItem> _items = [];
   final Set<String> _processingItemIds = {};
+  final Set<String> _pickedItemIds = {};
 
   ShoppingProvider({
     required ShoppingRepository repository,
@@ -41,17 +42,48 @@ class ShoppingProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   List<ShoppingItem> get items => _items;
+  Set<String> get pickedItemIds => Set.unmodifiable(_pickedItemIds);
 
   /// Unbought items (sorted newest first by backend).
   List<ShoppingItem> get unboughtItems =>
-      _items.where((item) => !item.bought).toList();
+      _items.where((item) => !item.bought && !item.archived).toList();
 
   /// Bought items (sorted most recently bought first by backend).
   List<ShoppingItem> get boughtItems =>
-      _items.where((item) => item.bought).toList();
+      _items.where((item) => item.bought && !item.archived).toList();
 
   /// Checks if a specific item is currently being processed to prevent double-actions.
   bool isItemProcessing(String id) => _processingItemIds.contains(id);
+
+  /// Checks whether an item is marked as picked in local memory.
+  bool isPicked(String id) => _pickedItemIds.contains(id);
+
+  /// Toggles the local, in-memory picked state of an item.
+  void togglePicked(String id) {
+    if (_pickedItemIds.contains(id)) {
+      _pickedItemIds.remove(id);
+    } else {
+      _pickedItemIds.add(id);
+    }
+    notifyListeners();
+  }
+
+  /// Explicitly sets the local, in-memory picked state of an item.
+  void setPicked(String id, bool picked) {
+    if (picked) {
+      _pickedItemIds.add(id);
+    } else {
+      _pickedItemIds.remove(id);
+    }
+    notifyListeners();
+  }
+
+  /// Clears all local picked states.
+  void clearPicked() {
+    if (_pickedItemIds.isEmpty) return;
+    _pickedItemIds.clear();
+    notifyListeners();
+  }
 
   /// Loads shopping items from the server.
   Future<void> loadItems() async {
@@ -81,12 +113,22 @@ class ShoppingProvider extends ChangeNotifier {
   }
 
   /// Adds a new item to the shopping list.
-  Future<bool> addItem(String name, {double? quantity}) async {
+  Future<bool> addItem(
+    String name, {
+    double? quantity,
+    String? unit,
+    String? category,
+  }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) return false;
 
     try {
-      await _repository.addShoppingItem(trimmedName, quantity: quantity);
+      await _repository.addShoppingItem(
+        trimmedName,
+        quantity: quantity,
+        unit: unit,
+        category: category,
+      );
       await loadItems();
       return true;
     } on ApiException catch (e) {
@@ -99,6 +141,61 @@ class ShoppingProvider extends ChangeNotifier {
       return false;
     } catch (_) {
       _errorMessage = 'Failed to add item to shopping list.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Archives (removes) a shopping item via PATCH archived=true.
+  Future<bool> archiveItem(String id) async {
+    final index = _items.indexWhere((item) => item.id == id);
+    ShoppingItem? removed;
+    if (index != -1) {
+      removed = _items[index];
+      _items = List<ShoppingItem>.from(_items)..removeAt(index);
+      notifyListeners();
+    }
+
+    try {
+      await _repository.updateShoppingItem(id, archived: true);
+      return true;
+    } on ApiException catch (e) {
+      if (removed != null) {
+        _items = List<ShoppingItem>.from(_items)..insert(index, removed);
+      }
+      if (e.statusCode == 401) {
+        _onUnauthorized?.call();
+      } else {
+        _errorMessage = e.message;
+        notifyListeners();
+      }
+      return false;
+    } catch (_) {
+      if (removed != null) {
+        _items = List<ShoppingItem>.from(_items)..insert(index, removed);
+      }
+      _errorMessage = 'Failed to remove item.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Restores an archived shopping item via PATCH archived=false.
+  Future<bool> unarchiveItem(String id) async {
+    try {
+      await _repository.updateShoppingItem(id, archived: false);
+      await loadItems();
+      return true;
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        _onUnauthorized?.call();
+      } else {
+        _errorMessage = e.message;
+        notifyListeners();
+      }
+      return false;
+    } catch (_) {
+      _errorMessage = 'Failed to restore item.';
       notifyListeners();
       return false;
     }
@@ -141,7 +238,6 @@ class ShoppingProvider extends ChangeNotifier {
       );
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
-        // Treat 409 as 'already bought', refresh the list and inform the user friendly
         await loadItems();
         return const MarkBoughtResult(
           status: MarkBoughtStatus.alreadyBought,

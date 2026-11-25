@@ -18,6 +18,9 @@ from app.modules.items.schemas import ItemCreate, ItemResponse
 from app.modules.items.service import create_item, parse_object_id
 from app.modules.shopping.schemas import (
     BoughtResponse,
+    BulkBoughtItemResult,
+    BulkBoughtRequest,
+    BulkBoughtResponse,
     MarkBoughtRequest,
     ShoppingItemCreate,
     ShoppingItemResponse,
@@ -32,6 +35,8 @@ def format_shopping_doc(doc: dict) -> ShoppingItemResponse:
         household_id=str(doc["household_id"]),
         name=doc["name"],
         quantity=doc.get("quantity"),
+        unit=doc.get("unit"),
+        category=doc.get("category"),
         bought=doc.get("bought", False),
         bought_at=doc.get("bought_at"),
         archived=doc.get("archived", False),
@@ -55,6 +60,8 @@ async def create_shopping_item(
         "household_id": hh_oid,
         "name": payload.name,
         "quantity": payload.quantity,
+        "unit": payload.unit,
+        "category": payload.category,
         "bought": False,
         "bought_at": None,
         "archived": False,
@@ -118,14 +125,14 @@ async def update_shopping_item(
     payload: ShoppingItemUpdate,
 ) -> ShoppingItemResponse:
     """
-    Updates allowed fields (name, quantity, archived) of a shopping item.
+    Updates allowed fields (name, quantity, unit, category, archived) of a shopping item.
     Enforces that household_id, bought, and added_by cannot be changed.
     """
     item_oid = parse_object_id(item_id)
     hh_oid = parse_object_id(household_id)
 
     raw_data = payload.model_dump(exclude_unset=True)
-    allowed_keys = {"name", "quantity", "archived"}
+    allowed_keys = {"name", "quantity", "unit", "category", "archived"}
     update_data = {k: v for k, v in raw_data.items() if k in allowed_keys}
 
     now = datetime.now(timezone.utc)
@@ -179,13 +186,15 @@ async def mark_item_bought(
 
     now = datetime.now(timezone.utc)
     item_quantity = payload.quantity if payload.quantity is not None else shopping_item.get("quantity")
+    item_unit = payload.unit if payload.unit is not None else shopping_item.get("unit")
+    item_category = payload.category if payload.category is not None else shopping_item.get("category")
 
     pantry_payload = ItemCreate(
         name=shopping_item["name"],
         expiry_date=payload.expiry_date,
         quantity=item_quantity,
-        unit=payload.unit,
-        category=payload.category,
+        unit=item_unit,
+        category=item_category,
         location=payload.location,
     )
 
@@ -309,3 +318,57 @@ async def mark_item_bought(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to complete bought transition: {str(exc)}",
         )
+
+
+async def mark_items_bought_bulk(
+    db: AsyncIOMotorDatabase,
+    household_id: str,
+    user_id: str,
+    payload: BulkBoughtRequest,
+) -> BulkBoughtResponse:
+    """
+    Marks multiple shopping items (1..50) as bought and creates corresponding pantry items.
+    Applies mark_item_bought logic per entry; a failure on one entry does not stop the rest.
+    Returns results in the same order as the input list.
+    """
+    results: List[BulkBoughtItemResult] = []
+
+    for entry in payload.items:
+        try:
+            bought_res = await mark_item_bought(
+                db=db,
+                household_id=household_id,
+                user_id=user_id,
+                item_id=entry.id,
+                payload=entry,
+            )
+            results.append(
+                BulkBoughtItemResult(
+                    id=entry.id,
+                    status="ok",
+                    code=status.HTTP_200_OK,
+                    message="Shopping item marked as bought.",
+                    shopping_item=bought_res.shopping_item,
+                    pantry_item=bought_res.pantry_item,
+                )
+            )
+        except HTTPException as exc:
+            results.append(
+                BulkBoughtItemResult(
+                    id=entry.id,
+                    status="error",
+                    code=exc.status_code,
+                    message=str(exc.detail),
+                )
+            )
+        except Exception as exc:
+            results.append(
+                BulkBoughtItemResult(
+                    id=entry.id,
+                    status="error",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=f"Failed to complete bought transition: {str(exc)}",
+                )
+            )
+
+    return BulkBoughtResponse(results=results)

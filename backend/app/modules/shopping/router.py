@@ -5,6 +5,7 @@ Exposes:
 - GET   /v1/shopping
 - POST  /v1/shopping
 - PATCH /v1/shopping/{id}
+- POST  /v1/shopping/bought-bulk
 - POST  /v1/shopping/{id}/bought
 """
 
@@ -16,6 +17,8 @@ from app.db import get_database
 from app.deps import AuthenticatedUser, get_current_auth
 from app.modules.shopping.schemas import (
     BoughtResponse,
+    BulkBoughtRequest,
+    BulkBoughtResponse,
     MarkBoughtRequest,
     ShoppingItemCreate,
     ShoppingItemResponse,
@@ -25,6 +28,7 @@ from app.modules.shopping.service import (
     create_shopping_item,
     list_shopping_items,
     mark_item_bought,
+    mark_items_bought_bulk,
     update_shopping_item,
 )
 
@@ -83,7 +87,7 @@ async def add_shopping_item(
     "/{id}",
     response_model=ShoppingItemResponse,
     summary="Update a shopping item",
-    description="Updates name, quantity, or archived flag of a shopping item. household_id, bought, and added_by cannot be changed.",
+    description="Updates name, quantity, unit, category, or archived flag of a shopping item. household_id, bought, and added_by cannot be changed.",
 )
 async def edit_shopping_item(
     id: str,
@@ -96,6 +100,26 @@ async def edit_shopping_item(
         db=db,
         household_id=auth.household_id,
         item_id=id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/bought-bulk",
+    response_model=BulkBoughtResponse,
+    summary="Mark multiple shopping items as bought",
+    description="Marks 1 to 50 shopping items bought=true and creates corresponding active pantry items. Per-item failures (404, 409, etc.) are reported in results without stopping remaining items.",
+)
+async def buy_items_bulk(
+    payload: BulkBoughtRequest,
+    auth: AuthenticatedUser = Depends(get_current_auth),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> BulkBoughtResponse:
+    """Transition multiple shopping items to bought and add them to the pantry."""
+    return await mark_items_bought_bulk(
+        db=db,
+        household_id=auth.household_id,
+        user_id=auth.user_id,
         payload=payload,
     )
 

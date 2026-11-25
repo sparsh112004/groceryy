@@ -116,11 +116,13 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
 10. **Mark Item Used or Thrown (`POST /v1/items/{id}/use` / `POST /v1/items/{id}/throw`):**
     - Soft-deletes item by updating `status` and `used_at` timestamp. Cross-household access or invalid IDs safely return `404 Not Found`.
 11. **Add Shopping Item (`POST /v1/shopping`):**
-    - Add an item to the shopping list:
+    - Add an item to the shopping list (supports decimal `quantity` and optional `unit` / `category`):
       ```json
       {
         "name": "Eggs",
-        "quantity": 12
+        "quantity": 12,
+        "unit": "pcs",
+        "category": "Dairy"
       }
       ```
     - Initializes with `bought=false` and `archived=false`.
@@ -129,9 +131,9 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
     - Supports `?bought=false` to fetch only unbought items.
     - Excludes archived items by default (`include_archived=false`).
 13. **Update Shopping Item (`PATCH /v1/shopping/{id}`):**
-    - Update mutable fields (`name`, `quantity`, `archived`). Prevents altering `household_id`, `bought`, or `added_by`.
+    - Update mutable fields (`name`, `quantity`, `unit`, `category`, `archived`). Prevents altering `household_id`, `bought`, or `added_by`.
 14. **Mark Shopping Item Bought (`POST /v1/shopping/{id}/bought`):**
-    - Supply expiration date and optional storage parameters:
+    - Supply expiration date and optional storage parameters (`quantity`, `unit`, and `category` fall back to the shopping item's stored values if omitted):
       ```json
       {
         "expiry_date": "2026-11-30",
@@ -141,9 +143,24 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
       ```
     - Atomically marks the shopping item `bought=true` (`bought_at=now`) and automatically creates a new active pantry item with computed `days_left` and `expiry_status`.
     - If already bought, returns `409 Conflict` and prevents creating duplicate pantry entries.
-15. **Get Household Details (`GET /v1/household`):**
+15. **Mark Multiple Shopping Items Bought (`POST /v1/shopping/bought-bulk`):**
+    - Supply 1 to 50 items with `id`, required `expiry_date`, and optional `quantity`, `unit`, `category`, and `location`:
+      ```json
+      {
+        "items": [
+          {
+            "id": "<shopping_item_id>",
+            "expiry_date": "2026-11-30",
+            "location": "Fridge"
+          }
+        ]
+      }
+      ```
+    - Applies the same household scoping, fallback, pantry creation, and `409` / `404` rules per entry without stopping on individual failures.
+    - Returns `200 OK` with `{ "results": [{ "id", "status", "code", "message", "shopping_item"?, "pantry_item"? }] }` in the same order.
+16. **Get Household Details (`GET /v1/household`):**
     - Returns current household info: `id`, `name`, `invite_code`, `is_active`, and safe member list (`id` and `name` only).
-16. **Join Household (`POST /v1/household/join`):**
+17. **Join Household (`POST /v1/household/join`):**
     - Join another household via 6-character invite code:
       ```json
       {
@@ -153,9 +170,9 @@ Interactive API documentation is available at [http://localhost:8000/docs](http:
     - Rate limited to 10 attempts per hour per user.
     - If the user was the sole member of their old household, all pantry items and shopping items are automatically migrated to the new household, and the old household is marked `is_active=false`.
     - Returns a fresh 30-day JWT token with the new `household_id`.
-17. **Regenerate Invite Code (`POST /v1/household/regenerate-code`):**
+18. **Regenerate Invite Code (`POST /v1/household/regenerate-code`):**
     - Invalidate the current code and generate a new unique 6-character code immediately.
-18. **Log Application Event (`POST /v1/events`):**
+19. **Log Application Event (`POST /v1/events`):**
     - Record product telemetry (allowed types: `app_open`, `signup`, `login`, `item_added`, `item_used`, `item_thrown`, `shopping_added`, `shopping_bought`, `reminder_opened`, `household_joined`, `invite_shared`):
       ```json
       {

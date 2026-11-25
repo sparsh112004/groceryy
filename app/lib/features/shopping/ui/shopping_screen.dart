@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pantry_app/core/grocery_catalog.dart';
 import 'package:pantry_app/features/pantry/data/item_model.dart';
 import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/features/shopping/data/shopping_item_model.dart';
 import 'package:pantry_app/features/shopping/state/shopping_provider.dart';
-import 'package:pantry_app/features/shopping/ui/bought_bottom_sheet.dart';
+import 'package:pantry_app/features/shopping/ui/add_shopping_item_sheet.dart';
+import 'package:pantry_app/features/shopping/ui/shopping_receipt_screen.dart';
 
-/// Shopping list screen following Wireframe 4:
-/// - Heading: "Shopping list"
-/// - Text field: "Add to list" with Enter or Add button submission
-/// - Duplicate hint: Gentle non-blocking note if name matches active pantry item
-/// - Unbought items with checkboxes (tapping opens Bought bottom sheet)
-/// - Bought section with crossed-out items and disabled checkboxes
-/// - Pull to refresh, loading state, retry on error, and empty state
+/// Shopping list screen:
+/// - Header: "Shopping list" with a Receipt icon button
+/// - Search field: "Search items to add" showing up to 6 catalog matches
+///   (or an "Add [typed text] as a new item" tile when nothing matches)
+/// - Gentle non-blocking duplicate hint if typed name matches active pantry item
+/// - Unbought items grouped under category headers with local picked checkboxes
+///   and swipe/icon remove (archived=true + Undo SnackBar)
+/// - Collapsed "Bought recently" section for already-bought items
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});
 
@@ -23,7 +26,6 @@ class ShoppingScreen extends StatefulWidget {
 class _ShoppingScreenState extends State<ShoppingScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  bool _isAdding = false;
 
   @override
   void initState() {
@@ -31,7 +33,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     _textController.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ShoppingProvider>().loadItems();
-      // Ensure pantry inventory is loaded for duplicate detection
       final itemsProvider = context.read<ItemsProvider>();
       if (itemsProvider.activeItems.isEmpty && !itemsProvider.isLoading) {
         itemsProvider.refreshAll();
@@ -51,7 +52,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     setState(() {});
   }
 
-  /// Finds an active pantry item that matches the input name (case-insensitive, trimmed).
+  /// Finds an active pantry item that matches the input name (case-insensitive).
   ItemModel? _findMatchingPantryItem(
     String input,
     List<ItemModel> activePantryItems,
@@ -59,18 +60,17 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     final trimmed = input.trim().toLowerCase();
     if (trimmed.isEmpty) return null;
 
-    final matches = activePantryItems.where(
-      (item) => item.name.trim().toLowerCase() == trimmed,
-    ).toList();
+    final matches = activePantryItems
+        .where((item) => item.name.trim().toLowerCase() == trimmed)
+        .toList();
 
     if (matches.isEmpty) return null;
 
-    // Return the match expiring soonest
     matches.sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     return matches.first;
   }
 
-  /// Generates the duplicate hint copy per SPEC (e.g. 'You already have Milk (expires in 3 days)').
+  /// Generates the duplicate hint copy (e.g. 'You already have Milk (expires in 3 days)').
   String _formatDuplicateHint(ItemModel item) {
     String expiryText;
     if (item.daysLeft < 0) {
@@ -85,68 +85,95 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     return 'You already have ${item.name} ($expiryText)';
   }
 
-  Future<void> _addItem() async {
-    final text = _textController.text.trim();
-    if (text.isEmpty || _isAdding) return;
-
-    setState(() => _isAdding = true);
-
+  Future<void> _openAddSheet({
+    required String itemName,
+    required String category,
+    required String initialUnit,
+  }) async {
     final shoppingProvider = context.read<ShoppingProvider>();
-    final success = await shoppingProvider.addItem(text);
-
-    if (mounted) {
-      setState(() => _isAdding = false);
-      if (success) {
-        _textController.clear();
-      } else {
-        final error = shoppingProvider.errorMessage;
-        if (error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _handleItemTap(ShoppingItem item) async {
-    if (item.bought) return;
-
-    final shoppingProvider = context.read<ShoppingProvider>();
-    final itemsProvider = context.read<ItemsProvider>();
-
-    final result = await BoughtBottomSheet.show(
+    final added = await AddShoppingItemSheet.show(
       context,
-      item: item,
-      onConfirm: (expiryDate) async {
-        return await shoppingProvider.markItemBought(
-          item.id,
-          expiryDate: expiryDate,
+      itemName: itemName,
+      category: category,
+      initialUnit: initialUnit,
+      onConfirm: (quantity, unit, selectedCategory) {
+        return shoppingProvider.addItem(
+          itemName,
+          quantity: quantity,
+          unit: unit,
+          category: selectedCategory,
         );
       },
     );
 
-    if (result != null && mounted) {
-      // Refresh pantry & home data on successful transition or 409 already bought
-      if (result.status == MarkBoughtStatus.success ||
-          result.status == MarkBoughtStatus.alreadyBought) {
-        itemsProvider.refreshAll();
+    if (!mounted) return;
+
+    if (added == true) {
+      _textController.clear();
+      _focusNode.unfocus();
+    } else if (added == null || added == false) {
+      final error = shoppingProvider.errorMessage;
+      if (added == false && error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
+    }
+  }
 
-      final message = result.status == MarkBoughtStatus.success
-          ? '${item.name} added to pantry'
-          : result.message;
+  Future<void> _archiveItem(ShoppingItem item) async {
+    final shoppingProvider = context.read<ShoppingProvider>();
+    final success = await shoppingProvider.archiveItem(item.id);
+    if (!mounted) return;
 
+    if (success) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text('Removed ${item.name}'),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              shoppingProvider.unarchiveItem(item.id);
+            },
+          ),
+        ),
+      );
+    } else if (shoppingProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(shoppingProvider.errorMessage!),
           duration: const Duration(seconds: 3),
         ),
       );
     }
+  }
+
+  Map<String, List<ShoppingItem>> _groupUnboughtByCategory(
+    List<ShoppingItem> unbought,
+  ) {
+    final grouped = <String, List<ShoppingItem>>{};
+    for (final item in unbought) {
+      final cat = item.effectiveCategory;
+      grouped.putIfAbsent(cat, () => []).add(item);
+    }
+
+    final ordered = <String, List<ShoppingItem>>{};
+    for (final cat in kCategories) {
+      final list = grouped.remove(cat);
+      if (list != null && list.isNotEmpty) {
+        ordered[cat] = list;
+      }
+    }
+    final remainingKeys = grouped.keys.toList()..sort();
+    for (final key in remainingKeys) {
+      ordered[key] = grouped[key]!;
+    }
+    return ordered;
   }
 
   @override
@@ -155,7 +182,10 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     final shopping = context.watch<ShoppingProvider>();
     final pantry = context.watch<ItemsProvider>();
 
-    final matchingItem = _findMatchingPantryItem(
+    final query = _textController.text.trim();
+    final catalogMatches =
+        query.isEmpty ? const <CatalogItem>[] : searchCatalog(query, limit: 6);
+    final matchingPantryItem = _findMatchingPantryItem(
       _textController.text,
       pantry.activeItems,
     );
@@ -163,46 +193,85 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     final unbought = shopping.unboughtItems;
     final bought = shopping.boughtItems;
     final hasItems = unbought.isNotEmpty || bought.isNotEmpty;
+    final groupedUnbought = _groupUnboughtByCategory(unbought);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header: "Shopping list"
+            // Header: "Shopping list" + Receipt button
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(
-                'Shopping list',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 28,
-                  color: const Color(0xFF111827),
-                ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Shopping list',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.receipt_long_outlined,
+                        size: 26,
+                      ),
+                      tooltip: 'Receipt',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ShoppingReceiptScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            // Input field: "Add to list"
+            // Search field: "Search items to add"
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
                     controller: _textController,
                     focusNode: _focusNode,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _addItem(),
-                    style: const TextStyle(fontSize: 17),
+                    textInputAction: TextInputAction.search,
+                    style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
-                      hintText: 'Add to list',
+                      hintText: 'Search items to add',
                       hintStyle: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         color: Color(0xFF9CA3AF),
                       ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: Color(0xFF6B7280),
+                      ),
+                      suffixIcon: query.isNotEmpty
+                          ? SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: IconButton(
+                                icon: const Icon(Icons.clear_rounded),
+                                tooltip: 'Clear search',
+                                onPressed: () => _textController.clear(),
+                              ),
+                            )
+                          : null,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 16,
+                        vertical: 14,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -225,40 +294,16 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                           width: 2.0,
                         ),
                       ),
-                      suffixIcon: _isAdding
-                          ? const Padding(
-                              padding: EdgeInsets.all(12.0),
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                ),
-                              ),
-                            )
-                          : IconButton(
-                              icon: Icon(
-                                Icons.add_circle,
-                                color: _textController.text.trim().isNotEmpty
-                                    ? theme.colorScheme.primary
-                                    : const Color(0xFF9CA3AF),
-                                size: 28,
-                              ),
-                              tooltip: 'Add to list',
-                              onPressed: _textController.text.trim().isNotEmpty
-                                  ? _addItem
-                                  : null,
-                            ),
                     ),
                   ),
 
                   // Duplicate hint (non-blocking, gentle note)
-                  if (matchingItem != null) ...[
+                  if (matchingPantryItem != null) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 8,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF7ED),
@@ -272,15 +317,15 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                         children: [
                           const Icon(
                             Icons.info_outline_rounded,
-                            size: 18,
+                            size: 20,
                             color: Color(0xFFC2410C),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _formatDuplicateHint(matchingItem),
+                              _formatDuplicateHint(matchingPantryItem),
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w500,
                                 color: Color(0xFFC2410C),
                               ),
@@ -290,11 +335,45 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                       ),
                     ),
                   ],
+
+                  // Catalog search suggestions
+                  if (query.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0D000000),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          if (catalogMatches.isNotEmpty)
+                            for (int i = 0; i < catalogMatches.length; i++) ...[
+                              _buildCatalogMatchTile(catalogMatches[i]),
+                              if (i < catalogMatches.length - 1)
+                                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                            ]
+                          else
+                            _buildNewItemTile(query),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
             // Content body: Loading, Error, Empty, or List
             Expanded(
@@ -364,7 +443,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                               ),
                               const SizedBox(height: 16),
                               const Text(
-                                'Your shopping list is clear. Add what you need.',
+                                'Your shopping list is clear. Search above to add what you need.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 16,
@@ -389,38 +468,59 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
                       children: [
-                        // Unbought items list (newest first)
-                        for (int i = 0; i < unbought.length; i++) ...[
-                          _buildUnboughtItemRow(unbought[i]),
-                          const Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFE5E7EB),
-                          ),
-                        ],
-
-                        // Bought items section
-                        if (bought.isNotEmpty) ...[
-                          const SizedBox(height: 24),
+                        // Unbought items grouped by category
+                        for (final entry in groupedUnbought.entries) ...[
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            padding: const EdgeInsets.only(top: 14, bottom: 6),
                             child: Text(
-                              'Bought',
+                              entry.key,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: const Color(0xFF4B5563),
+                                fontSize: 17,
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                           ),
-                          for (int i = 0; i < bought.length; i++) ...[
-                            _buildBoughtItemRow(bought[i]),
+                          for (final item in entry.value) ...[
+                            _buildUnboughtItemRow(item, shopping),
                             const Divider(
                               height: 1,
                               thickness: 1,
                               color: Color(0xFFE5E7EB),
                             ),
                           ],
+                        ],
+
+                        // Collapsed "Bought recently" section
+                        if (bought.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Theme(
+                            data: theme.copyWith(
+                              dividerColor: Colors.transparent,
+                            ),
+                            child: ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              initiallyExpanded: false,
+                              title: Text(
+                                'Bought recently (${bought.length})',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                  color: const Color(0xFF4B5563),
+                                ),
+                              ),
+                              children: [
+                                for (final item in bought) ...[
+                                  _buildBoughtItemRow(item),
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -434,39 +534,76 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     );
   }
 
-  /// Unbought item row: Checkbox + Name, tapping triggers Bought flow bottom sheet
-  Widget _buildUnboughtItemRow(ShoppingItem item) {
+  Widget _buildCatalogMatchTile(CatalogItem item) {
     return InkWell(
-      onTap: () => _handleItemTap(item),
-      borderRadius: BorderRadius.circular(8),
+      onTap: () => _openAddSheet(
+        itemName: item.name,
+        category: item.category,
+        initialUnit: item.defaultUnit,
+      ),
       child: Container(
         constraints: const BoxConstraints(minHeight: 52),
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: Checkbox(
-                value: false,
-                onChanged: (_) => _handleItemTap(item),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                side: const BorderSide(
-                  color: Color(0xFF4B5563),
-                  width: 1.5,
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  Text(
+                    '${item.category} • ${item.defaultUnit}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
+            const Icon(
+              Icons.add_circle_outline_rounded,
+              color: Color(0xFF0F766E),
+              size: 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewItemTile(String query) {
+    return InkWell(
+      onTap: () => _openAddSheet(
+        itemName: query,
+        category: categoryFor(query),
+        initialUnit: 'pcs',
+      ),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.add_circle_outline_rounded,
+              color: Color(0xFF0F766E),
+              size: 24,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                item.displayTitle,
+                'Add "$query" as a new item',
                 style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1F2937),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F766E),
                 ),
               ),
             ),
@@ -476,11 +613,107 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     );
   }
 
-  /// Bought item row: Disabled checked Checkbox + strikethrough name
+  /// Unbought item row: Checkbox toggles local picked state; swipe or icon archives item.
+  Widget _buildUnboughtItemRow(
+    ShoppingItem item,
+    ShoppingProvider shopping,
+  ) {
+    final isPicked = shopping.isPicked(item.id);
+    final qty = item.formattedQuantity;
+
+    return Dismissible(
+      key: ValueKey('shopping_${item.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        color: const Color(0xFFDC2626),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: Colors.white,
+          size: 26,
+        ),
+      ),
+      onDismissed: (_) => _archiveItem(item),
+      child: InkWell(
+        onTap: () => shopping.togglePicked(item.id),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: Checkbox(
+                  value: isPicked,
+                  onChanged: (_) => shopping.togglePicked(item.id),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  side: const BorderSide(
+                    color: Color(0xFF4B5563),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  item.name,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w500,
+                    color: isPicked
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF1F2937),
+                    decoration:
+                        isPicked ? TextDecoration.lineThrough : TextDecoration.none,
+                  ),
+                ),
+              ),
+              if (qty != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  qty,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isPicked
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF4B5563),
+                    decoration:
+                        isPicked ? TextDecoration.lineThrough : TextDecoration.none,
+                  ),
+                ),
+              ],
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 22,
+                    color: Color(0xFF6B7280),
+                  ),
+                  tooltip: 'Remove ${item.name}',
+                  onPressed: () => _archiveItem(item),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Bought item row: Disabled checked Checkbox + strikethrough name + quantity.
   Widget _buildBoughtItemRow(ShoppingItem item) {
+    final qty = item.formattedQuantity;
     return Container(
       constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
           SizedBox(
@@ -494,18 +727,29 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
-              item.displayTitle,
+              item.name,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: FontWeight.w400,
                 color: Color(0xFF9CA3AF),
                 decoration: TextDecoration.lineThrough,
               ),
             ),
           ),
+          if (qty != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              qty,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF9CA3AF),
+                decoration: TextDecoration.lineThrough,
+              ),
+            ),
+          ],
         ],
       ),
     );
