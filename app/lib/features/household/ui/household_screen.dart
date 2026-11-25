@@ -1,9 +1,11 @@
 // Imports
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData, FilteringTextInputFormatter;
 import 'package:provider/provider.dart';
 
 import 'package:pantry_app/core/api_client.dart';
+import 'package:pantry_app/core/notification_service.dart';
 import 'package:pantry_app/features/household/data/household_repository.dart';
 import 'package:pantry_app/features/household/state/household_provider.dart';
 import 'package:pantry_app/features/auth/state/auth_provider.dart';
@@ -39,6 +41,7 @@ class _HouseholdScreenBody extends StatefulWidget {
 
 class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
   final TextEditingController _joinCodeController = TextEditingController();
+  bool _isSendingTestNotification = false;
 
   @override
   void dispose() {
@@ -57,6 +60,26 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
 
   Future<void> _refresh() async {
     await context.read<HouseholdProvider>().load();
+  }
+
+  Future<void> _sendTestNotification() async {
+    if (_isSendingTestNotification) return;
+    setState(() => _isSendingTestNotification = true);
+    try {
+      await NotificationService.instance.init();
+      final granted = await NotificationService.instance.requestPermission();
+      if (granted) {
+        await NotificationService.instance.showTestNotification();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notification permission denied')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingTestNotification = false);
+      }
+    }
   }
 
   // Regenerate invite code flow.
@@ -298,6 +321,16 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                ],
+                if (kDebugMode && !kIsWeb) ...[
+                  Center(
+                    child: OutlinedButton(
+                      onPressed: _isSendingTestNotification ? null : _sendTestNotification,
+                      style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                      child: const Text('Send test notification'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                 ],
                 Center(
                   child: OutlinedButton.icon(
