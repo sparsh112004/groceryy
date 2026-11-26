@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pantry_app/app_theme.dart';
 import 'package:pantry_app/core/grocery_catalog.dart';
+import 'package:pantry_app/core/ui_helpers.dart';
 import 'package:pantry_app/features/pantry/data/item_model.dart';
 import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/features/shopping/data/shopping_item_model.dart';
@@ -9,14 +11,9 @@ import 'package:pantry_app/features/shopping/ui/add_shopping_item_sheet.dart';
 import 'package:pantry_app/features/shopping/ui/add_to_pantry_flow_screen.dart';
 import 'package:pantry_app/features/shopping/ui/shopping_receipt_screen.dart';
 
-/// Shopping list screen:
-/// - Header: "Shopping list" with a Receipt icon button
-/// - Search field: "Search items to add" showing up to 6 catalog matches
-///   (or an "Add [typed text] as a new item" tile when nothing matches)
-/// - Gentle non-blocking duplicate hint if typed name matches active pantry item
-/// - Unbought items grouped under category headers with local picked checkboxes
-///   and swipe/icon remove (archived=true + Undo SnackBar)
-/// - Collapsed "Bought recently" section for already-bought items
+enum _ShoppingTab { toBuy, bought }
+
+/// Shopping list screen with soothing sage cards, To Buy / Bought toggle, and catalog search.
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});
 
@@ -27,6 +24,7 @@ class ShoppingScreen extends StatefulWidget {
 class _ShoppingScreenState extends State<ShoppingScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  _ShoppingTab _activeTab = _ShoppingTab.toBuy;
 
   @override
   void initState() {
@@ -53,7 +51,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     setState(() {});
   }
 
-  /// Finds an active pantry item that matches the input name (case-insensitive).
   ItemModel? _findMatchingPantryItem(
     String input,
     List<ItemModel> activePantryItems,
@@ -71,7 +68,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     return matches.first;
   }
 
-  /// Generates the duplicate hint copy (e.g. 'You already have Milk (expires in 3 days)').
   String _formatDuplicateHint(ItemModel item) {
     String expiryText;
     if (item.daysLeft < 0) {
@@ -112,14 +108,11 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     if (added == true) {
       _textController.clear();
       _focusNode.unfocus();
-    } else if (added == null || added == false) {
+    } else if (added == false) {
       final error = shoppingProvider.errorMessage;
-      if (added == false && error != null) {
+      if (error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            duration: const Duration(seconds: 3),
-          ),
+          SnackBar(content: Text(error), duration: const Duration(seconds: 3)),
         );
       }
     }
@@ -140,10 +133,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(label),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(label), duration: const Duration(seconds: 3)),
     );
   }
 
@@ -199,6 +189,59 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     return ordered;
   }
 
+  Widget _buildTabToggle(int toBuyCount, int boughtCount) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7EDE8),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _buildSegmentButton(
+            label: 'To Buy ($toBuyCount)',
+            selected: _activeTab == _ShoppingTab.toBuy,
+            onTap: () => setState(() => _activeTab = _ShoppingTab.toBuy),
+          ),
+          _buildSegmentButton(
+            label: 'Bought ($boughtCount)',
+            selected: _activeTab == _ShoppingTab.bought,
+            onTap: () => setState(() => _activeTab = _ShoppingTab.bought),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Material(
+        color: selected ? AppTheme.primaryGreen : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(11),
+          child: Container(
+            height: 40,
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppTheme.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -223,18 +266,24 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header: "Shopping list" + Receipt button
+            // Header: "Shopping List" + Receipt button
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 10),
               child: Row(
                 children: [
-                  Expanded(
+                  const Icon(
+                    Icons.shopping_cart_rounded,
+                    color: AppTheme.primaryGreen,
+                    size: 26,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: Text(
-                      'Shopping list',
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                      'Shopping List',
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 28,
-                        color: const Color(0xFF111827),
+                        fontSize: 26,
+                        color: AppTheme.textPrimary,
                       ),
                     ),
                   ),
@@ -244,7 +293,8 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     child: IconButton(
                       icon: const Icon(
                         Icons.receipt_long_outlined,
-                        size: 26,
+                        size: 25,
+                        color: AppTheme.textPrimary,
                       ),
                       tooltip: 'Receipt',
                       onPressed: () {
@@ -260,9 +310,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               ),
             ),
 
-            // Search field: "Search items to add"
+            // Search/Add field + Segmented Toggle
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -272,14 +322,14 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
-                      hintText: 'Search items to add',
+                      hintText: 'Add an item...',
                       hintStyle: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF9CA3AF),
+                        fontSize: 15,
+                        color: AppTheme.textSecondary,
                       ),
                       prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: Color(0xFF6B7280),
+                        Icons.add_rounded,
+                        color: AppTheme.primaryGreen,
                       ),
                       suffixIcon: query.isNotEmpty
                           ? SizedBox(
@@ -292,35 +342,34 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                               ),
                             )
                           : null,
+                      filled: true,
+                      fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                        horizontal: 14,
+                        vertical: 12,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: const BorderSide(
-                          color: Color(0xFF4B5563),
-                          width: 1.5,
+                          color: AppTheme.borderSubtle,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: const BorderSide(
-                          color: Color(0xFF4B5563),
-                          width: 1.5,
+                          color: AppTheme.borderSubtle,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 2.0,
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryGreen,
+                          width: 1.5,
                         ),
                       ),
                     ),
                   ),
 
-                  // Duplicate hint (non-blocking, gentle note)
                   if (matchingPantryItem != null) ...[
                     const SizedBox(height: 8),
                     Container(
@@ -329,11 +378,10 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7ED),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppTheme.statusSoonContainer,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: const Color(0xFFFDBA74),
-                          width: 1,
+                          color: const Color(0xFFF3CF9B),
                         ),
                       ),
                       child: Row(
@@ -341,16 +389,16 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                           const Icon(
                             Icons.info_outline_rounded,
                             size: 20,
-                            color: Color(0xFFC2410C),
+                            color: AppTheme.statusSoon,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _formatDuplicateHint(matchingPantryItem),
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFFC2410C),
+                                color: AppTheme.statusSoon,
                               ),
                             ),
                           ),
@@ -359,23 +407,11 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     ),
                   ],
 
-                  // Catalog search suggestions
                   if (query.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
-                      constraints: const BoxConstraints(maxHeight: 280),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFD1D5DB)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x0D000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                      constraints: const BoxConstraints(maxHeight: 260),
+                      decoration: AppTheme.cardDecoration(radius: 14),
                       child: ListView(
                         shrinkWrap: true,
                         padding: EdgeInsets.zero,
@@ -384,7 +420,10 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                             for (int i = 0; i < catalogMatches.length; i++) ...[
                               _buildCatalogMatchTile(catalogMatches[i]),
                               if (i < catalogMatches.length - 1)
-                                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                                const Divider(
+                                  height: 1,
+                                  color: AppTheme.borderSubtle,
+                                ),
                             ]
                           else
                             _buildNewItemTile(query),
@@ -392,20 +431,20 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                       ),
                     ),
                   ],
+
+                  const SizedBox(height: 12),
+                  _buildTabToggle(unbought.length, bought.length),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
 
-            const SizedBox(height: 6),
-
-            // Content body: Loading, Error, Empty, or List
+            // Content body
             Expanded(
               child: Builder(
                 builder: (context) {
                   if (shopping.isLoading && !hasItems) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   if (shopping.errorMessage != null && !hasItems) {
@@ -418,27 +457,18 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                             const Icon(
                               Icons.error_outline_rounded,
                               size: 48,
-                              color: Color(0xFFDC2626),
+                              color: AppTheme.statusExpired,
                             ),
                             const SizedBox(height: 16),
                             Text(
                               shopping.errorMessage!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF374151),
-                              ),
+                              style: theme.textTheme.bodyLarge,
                             ),
                             const SizedBox(height: 20),
-                            ElevatedButton(
+                            FilledButton(
                               onPressed: () => shopping.loadItems(),
-                              style: ElevatedButton.styleFrom(
-                                minimumSize: const Size(120, 48),
-                              ),
-                              child: const Text(
-                                'Retry',
-                                style: TextStyle(fontSize: 16),
-                              ),
+                              child: const Text('Retry'),
                             ),
                           ],
                         ),
@@ -446,37 +476,46 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     );
                   }
 
-                  if (!hasItems) {
+                  final activeList =
+                      _activeTab == _ShoppingTab.toBuy ? unbought : bought;
+
+                  if (activeList.isEmpty) {
                     return RefreshIndicator(
                       onRefresh: () => shopping.loadItems(),
-                      child: SingleChildScrollView(
+                      child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        child: Container(
-                          height: 380,
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.shopping_cart_outlined,
-                                size: 64,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.6),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Your shopping list is clear. Search above to add what you need.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Color(0xFF6B7280),
-                                  fontWeight: FontWeight.w500,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 28,
+                              vertical: 56,
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  _activeTab == _ShoppingTab.toBuy
+                                      ? Icons.shopping_cart_outlined
+                                      : Icons.check_circle_outline_rounded,
+                                  size: 60,
+                                  color: AppTheme.primaryGreen
+                                      .withValues(alpha: 0.45),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 16),
+                                Text(
+                                  _activeTab == _ShoppingTab.toBuy
+                                      ? 'Your shopping list is clear.\nSearch above to add what you need.'
+                                      : 'No bought items yet.\nItems you mark as purchased will appear here.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: AppTheme.textSecondary,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     );
                   }
@@ -489,62 +528,76 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                       ]);
                     },
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                       children: [
-                        // Unbought items grouped by category
-                        for (final entry in groupedUnbought.entries) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(top: 14, bottom: 6),
-                            child: Text(
-                              entry.key,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17,
-                                color: theme.colorScheme.primary,
+                        if (_activeTab == _ShoppingTab.toBuy)
+                          for (final entry in groupedUnbought.entries) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 8,
+                                bottom: 8,
                               ),
-                            ),
-                          ),
-                          for (final item in entry.value) ...[
-                            _buildUnboughtItemRow(item, shopping),
-                            const Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: Color(0xFFE5E7EB),
-                            ),
-                          ],
-                        ],
-
-                        // Collapsed "Bought recently" section
-                        if (bought.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Theme(
-                            data: theme.copyWith(
-                              dividerColor: Colors.transparent,
-                            ),
-                            child: ExpansionTile(
-                              tilePadding: EdgeInsets.zero,
-                              initiallyExpanded: false,
-                              title: Text(
-                                'Bought recently (${bought.length})',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 17,
-                                  color: const Color(0xFF4B5563),
-                                ),
-                              ),
-                              children: [
-                                for (final item in bought) ...[
-                                  _buildBoughtItemRow(item),
-                                  const Divider(
-                                    height: 1,
-                                    thickness: 1,
-                                    color: Color(0xFFE5E7EB),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    itemEmoji('', entry.key),
+                                    style: const TextStyle(fontSize: 16),
                                   ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    entry.key,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: AppTheme.primaryGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: AppTheme.cardDecoration(),
+                              child: Column(
+                                children: [
+                                  for (int i = 0;
+                                      i < entry.value.length;
+                                      i++) ...[
+                                    if (i > 0)
+                                      const Divider(
+                                        height: 1,
+                                        indent: 16,
+                                        endIndent: 16,
+                                        color: AppTheme.borderSubtle,
+                                      ),
+                                    _buildUnboughtItemRow(
+                                      entry.value[i],
+                                      shopping,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ]
+                        else
+                          Container(
+                            decoration: AppTheme.cardDecoration(),
+                            child: Column(
+                              children: [
+                                for (int i = 0; i < bought.length; i++) ...[
+                                  if (i > 0)
+                                    const Divider(
+                                      height: 1,
+                                      indent: 16,
+                                      endIndent: 16,
+                                      color: AppTheme.borderSubtle,
+                                    ),
+                                  _buildBoughtItemRow(bought[i]),
                                 ],
                               ],
                             ),
                           ),
-                        ],
                       ],
                     ),
                   );
@@ -552,32 +605,26 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               ),
             ),
 
-            if (unbought.isNotEmpty)
+            if (_activeTab == _ShoppingTab.toBuy && unbought.isNotEmpty)
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+                  border: Border(
+                    top: BorderSide(color: AppTheme.borderSubtle),
+                  ),
                 ),
                 child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
+                  height: 50,
+                  child: FilledButton.icon(
                     onPressed: _openAddToPantryFlow,
-                    icon: const Icon(Icons.kitchen_outlined, size: 22),
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 20),
                     label: const Text(
-                      'I am back: Add to pantry',
+                      'Mark as Purchased',
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
                     ),
                   ),
                 ),
@@ -596,36 +643,39 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         initialUnit: item.defaultUnit,
       ),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
+        constraints: const BoxConstraints(minHeight: 50),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
+            Text(
+              itemEmoji(item.name, item.category),
+              style: const TextStyle(fontSize: 20),
+            ),
+            const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  Text(
-                    '${item.category} • ${item.defaultUnit}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
+              child: Text(
+                item.name,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.textPrimary,
+                ),
               ),
             ),
-            const Icon(
-              Icons.add_circle_outline_rounded,
-              color: Color(0xFF0F766E),
-              size: 24,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.softMintTint,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                item.category,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryGreenDark,
+                ),
+              ),
             ),
           ],
         ),
@@ -641,23 +691,23 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         initialUnit: 'pcs',
       ),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
+        constraints: const BoxConstraints(minHeight: 50),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             const Icon(
               Icons.add_circle_outline_rounded,
-              color: Color(0xFF0F766E),
-              size: 24,
+              color: AppTheme.primaryGreen,
+              size: 22,
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Add "$query" as a new item',
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F766E),
+                  color: AppTheme.primaryGreen,
                 ),
               ),
             ),
@@ -667,12 +717,11 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     );
   }
 
-  /// Unbought item row: Checkbox toggles local picked state; swipe or icon archives item.
   Widget _buildUnboughtItemRow(
     ShoppingItem item,
     ShoppingProvider shopping,
   ) {
-    final isPicked = shopping.isPicked(item.id);
+    final picked = shopping.isPicked(item.id);
     final qty = item.formattedQuantity;
 
     return Dismissible(
@@ -680,80 +729,58 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        color: const Color(0xFFDC2626),
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: AppTheme.statusExpiredContainer,
+          borderRadius: BorderRadius.circular(18),
+        ),
         child: const Icon(
           Icons.delete_outline_rounded,
-          color: Colors.white,
-          size: 26,
+          color: AppTheme.statusExpired,
         ),
       ),
       onDismissed: (_) => _archiveItem(item),
       child: InkWell(
         onTap: () => shopping.togglePicked(item.id),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 52),
-          padding: const EdgeInsets.symmetric(vertical: 6.0),
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
               SizedBox(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 child: Checkbox(
-                  value: isPicked,
-                  onChanged: (_) => shopping.togglePicked(item.id),
+                  value: picked,
+                  activeColor: AppTheme.primaryGreen,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  side: const BorderSide(
-                    color: Color(0xFF4B5563),
-                    width: 1.5,
-                  ),
+                  onChanged: (_) => shopping.togglePicked(item.id),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  item.name,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
-                    color: isPicked
-                        ? const Color(0xFF9CA3AF)
-                        : const Color(0xFF1F2937),
-                    decoration:
-                        isPicked ? TextDecoration.lineThrough : TextDecoration.none,
-                  ),
-                ),
-              ),
-              if (qty != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  qty,
+                  qty != null ? '${item.name} ($qty)' : item.name,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isPicked
-                        ? const Color(0xFF9CA3AF)
-                        : const Color(0xFF4B5563),
-                    decoration:
-                        isPicked ? TextDecoration.lineThrough : TextDecoration.none,
+                    color: picked
+                        ? AppTheme.textSecondary
+                        : AppTheme.textPrimary,
+                    decoration: picked ? TextDecoration.lineThrough : null,
                   ),
                 ),
-              ],
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 22,
-                    color: Color(0xFF6B7280),
-                  ),
-                  tooltip: 'Remove ${item.name}',
-                  onPressed: () => _archiveItem(item),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 19,
+                  color: AppTheme.textSecondary,
                 ),
+                tooltip: 'Remove item',
+                onPressed: () => _archiveItem(item),
               ),
             ],
           ),
@@ -762,48 +789,37 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     );
   }
 
-  /// Bought item row: Disabled checked Checkbox + strikethrough name + quantity.
   Widget _buildBoughtItemRow(ShoppingItem item) {
     final qty = item.formattedQuantity;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Row(
         children: [
           SizedBox(
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             child: Checkbox(
               value: true,
               onChanged: null,
+              fillColor: WidgetStateProperty.all(
+                AppTheme.primaryGreen.withValues(alpha: 0.55),
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
               ),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
-              item.name,
+              qty != null ? '${item.name} ($qty)' : item.name,
               style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w400,
-                color: Color(0xFF9CA3AF),
+                color: AppTheme.textSecondary,
                 decoration: TextDecoration.lineThrough,
               ),
             ),
           ),
-          if (qty != null) ...[
-            const SizedBox(width: 8),
-            Text(
-              qty,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF9CA3AF),
-                decoration: TextDecoration.lineThrough,
-              ),
-            ),
-          ],
         ],
       ),
     );

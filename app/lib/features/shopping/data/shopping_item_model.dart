@@ -75,6 +75,34 @@ class ShoppingItem {
     return name;
   }
 
+  /// Parses a server ISO-8601 timestamp into local time.
+  /// Naive timestamps (without 'Z' or offset) are treated as UTC.
+  static DateTime? _parseServerDateTime(dynamic raw) {
+    if (raw == null) return null;
+    final text = raw.toString().trim();
+    if (text.isEmpty) return null;
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) return null;
+
+    final hasExplicitZone =
+        text.endsWith('Z') ||
+        text.endsWith('z') ||
+        RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(text);
+    if (!hasExplicitZone && !parsed.isUtc) {
+      return DateTime.utc(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+        parsed.second,
+        parsed.millisecond,
+        parsed.microsecond,
+      ).toLocal();
+    }
+    return parsed.toLocal();
+  }
+
   factory ShoppingItem.fromJson(Map<String, dynamic> json) {
     return ShoppingItem(
       id: json['id'] as String? ?? '',
@@ -84,17 +112,11 @@ class ShoppingItem {
       unit: json['unit'] as String?,
       category: json['category'] as String?,
       bought: json['bought'] as bool? ?? false,
-      boughtAt: json['bought_at'] != null
-          ? DateTime.tryParse(json['bought_at'].toString())
-          : null,
+      boughtAt: _parseServerDateTime(json['bought_at']),
       archived: json['archived'] as bool? ?? false,
       addedBy: json['added_by'] as String? ?? '',
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt: _parseServerDateTime(json['created_at']) ?? DateTime.now(),
+      updatedAt: _parseServerDateTime(json['updated_at']) ?? DateTime.now(),
     );
   }
 

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pantry_app/app_theme.dart';
 import 'package:pantry_app/features/auth/state/auth_provider.dart';
 
-/// Single authentication screen supporting both Login and Sign up modes.
-/// Follows wireframe and Material 3 design rules with tap targets >= 48dp and text >= 16sp.
+/// Single authentication screen supporting both Login and Sign up modes
+/// with a soothing sage-and-forest-green Stockora design.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -17,28 +18,31 @@ class _AuthScreenState extends State<AuthScreen> {
   final _nameController = TextEditingController();
   final _identifierController = TextEditingController();
   final _secretController = TextEditingController();
+  final _confirmSecretController = TextEditingController();
 
   bool _isLogin = true;
   bool _obscureSecret = true;
+  bool _obscureConfirmSecret = true;
 
   @override
   void dispose() {
     _nameController.dispose();
     _identifierController.dispose();
     _secretController.dispose();
+    _confirmSecretController.dispose();
     super.dispose();
   }
 
   void _switchMode() {
     setState(() {
       _isLogin = !_isLogin;
+      _confirmSecretController.clear();
       _formKey.currentState?.reset();
     });
     context.read<AuthProvider>().clearError();
   }
 
   Future<void> _submit() async {
-    // Clear any previous error message
     context.read<AuthProvider>().clearError();
 
     if (!_formKey.currentState!.validate()) {
@@ -59,256 +63,472 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        fontSize: 15,
+        color: AppTheme.textSecondary,
+      ),
+      prefixIcon: Icon(icon, color: AppTheme.primaryGreen, size: 22),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD2DBD4)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD2DBD4)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 1.6),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppTheme.statusExpired),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppTheme.statusExpired, width: 1.6),
+      ),
+    );
+  }
+
+  Widget _buildBrandHeader() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppTheme.softMintTint,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFBBD8C3)),
+              ),
+              child: const Icon(
+                Icons.kitchen_rounded,
+                color: AppTheme.primaryGreen,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Stockora',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.eco_rounded,
+              color: AppTheme.primaryGreenLight,
+              size: 20,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(width: 18, height: 1.5, color: AppTheme.primaryGreenLight),
+            const SizedBox(width: 8),
+            const Text(
+              'PANTRY  •  TRACK  •  NO WASTE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(width: 18, height: 1.5, color: AppTheme.primaryGreenLight),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroIllustration() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.softMintTint,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (!_isLogin) ...[
+            const Text('🪴', style: TextStyle(fontSize: 34)),
+            const SizedBox(width: 10),
+          ],
+          _jarCard('🌾', const Color(0xFFFFF4D6), 48),
+          const SizedBox(width: 10),
+          _jarCard('🫘', const Color(0xFFFFEBD6), 42),
+          const SizedBox(width: 10),
+          _jarCard('🍯', const Color(0xFFFDE5D4), 38),
+          if (_isLogin) ...[
+            const SizedBox(width: 10),
+            const Text('🌿', style: TextStyle(fontSize: 28)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _jarCard(String emoji, Color bg, double size) {
+    return Container(
+      width: size,
+      height: size + 8,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD5B48A), width: 1.4),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(emoji, style: TextStyle(fontSize: size * 0.52)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final isSubmitting = authProvider.isSubmitting;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Logo Placeholder
-                    Center(
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.kitchen_rounded,
-                          size: 44,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+      backgroundColor: const Color(0xFFFAFBF9),
+      body: Stack(
+        children: [
+          // Soft sage decorative background shapes
+          Positioned(
+            top: -70,
+            left: -60,
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryContainer.withValues(alpha: 0.45),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -90,
+            right: -60,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryContainer.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 20.0,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildBrandHeader(),
+                        const SizedBox(height: 18),
+                        Center(child: _buildHeroIllustration()),
+                        const SizedBox(height: 20),
 
-                    // Heading
-                    Text(
-                      'Welcome to Stockora',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Subtitle / Mission line
-                    Text(
-                      'Know what is at home, use it before it expires.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF4B5563),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Backend error banner (if any)
-                    if (authProvider.errorMessage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 12.0,
+                        // Heading & Subtitle
+                        Text(
+                          _isLogin ? 'Welcome Back!' : 'Create Your Account',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFEBEE),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFEF5350)),
+                        const SizedBox(height: 6),
+                        Text(
+                          _isLogin
+                              ? 'Login to continue managing your pantry.'
+                              : 'Start managing your pantry smarter.',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppTheme.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.error_outline_rounded,
-                              color: Color(0xFFC62828),
-                              size: 24,
+                        const SizedBox(height: 22),
+
+                        // Backend error banner
+                        if (authProvider.errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14.0,
+                              vertical: 12.0,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                authProvider.errorMessage!,
-                                style: const TextStyle(
-                                  color: Color(0xFFC62828),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.statusExpiredContainer,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFF3B4B4),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // Name Field (Sign Up only)
-                    if (!_isLogin) ...[
-                      TextFormField(
-                        controller: _nameController,
-                        textInputAction: TextInputAction.next,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: const InputDecoration(
-                          labelText: 'Name',
-                          hintText: 'Your name or household nickname',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: AppTheme.statusExpired,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    authProvider.errorMessage!,
+                                    style: const TextStyle(
+                                      color: AppTheme.statusExpired,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter your name.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                          const SizedBox(height: 16),
+                        ],
 
-                    // Phone or Email Field
-                    TextFormField(
-                      controller: _identifierController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: const InputDecoration(
-                        labelText: 'Phone or email',
-                        hintText: 'e.g. alex@example.com or phone number',
-                        prefixIcon: Icon(Icons.contact_mail_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your phone number or email.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // PIN or Password Field with Show/Hide Toggle
-                    TextFormField(
-                      controller: _secretController,
-                      obscureText: _obscureSecret,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      style: const TextStyle(fontSize: 16),
-                      decoration: InputDecoration(
-                        labelText: 'PIN or password',
-                        hintText: 'Min 4-digit PIN or 6-character password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureSecret
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                        // Name Field (Sign Up only)
+                        if (!_isLogin) ...[
+                          TextFormField(
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            style: const TextStyle(fontSize: 16),
+                            decoration: _inputDecoration(
+                              hint: 'Name',
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your name.';
+                              }
+                              return null;
+                            },
                           ),
-                          tooltip: _obscureSecret ? 'Show password' : 'Hide password',
-                          onPressed: () {
-                            setState(() {
-                              _obscureSecret = !_obscureSecret;
-                            });
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Phone or Email Field
+                        TextFormField(
+                          controller: _identifierController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: _inputDecoration(
+                            hint: 'Phone or Email',
+                            icon: Icons.mail_outline_rounded,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your phone number or email.';
+                            }
+                            return null;
                           },
                         ),
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your PIN or password.';
-                        }
-                        final cleaned = value.trim();
-                        final isNumeric = cleaned.split('').every(
-                              (ch) => '0123456789'.contains(ch),
-                            );
+                        const SizedBox(height: 12),
 
-                        if (isNumeric) {
-                          if (cleaned.length < 4) {
-                            return 'Numeric PIN must be at least 4 digits.';
-                          }
-                        } else {
-                          if (cleaned.length < 6) {
-                            return 'Password must be at least 6 characters.';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Primary Action Button (Log in / Sign up)
-                    FilledButton(
-                      onPressed: isSubmitting ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
+                        // PIN or Password Field
+                        TextFormField(
+                          controller: _secretController,
+                          obscureText: _obscureSecret,
+                          textInputAction: _isLogin
+                              ? TextInputAction.done
+                              : TextInputAction.next,
+                          onFieldSubmitted: _isLogin ? (_) => _submit() : null,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: _inputDecoration(
+                            hint: 'PIN or Password',
+                            icon: Icons.lock_outline_rounded,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureSecret
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: AppTheme.textSecondary,
                               ),
-                            )
-                          : Text(
-                              _isLogin ? 'Log in' : 'Sign up',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                              tooltip: _obscureSecret
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              onPressed: () {
+                                setState(() {
+                                  _obscureSecret = !_obscureSecret;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your PIN or password.';
+                            }
+                            final cleaned = value.trim();
+                            final isNumeric = cleaned.split('').every(
+                                  (ch) => '0123456789'.contains(ch),
+                                );
+
+                            if (isNumeric) {
+                              if (cleaned.length < 4) {
+                                return 'Numeric PIN must be at least 4 digits.';
+                              }
+                            } else {
+                              if (cleaned.length < 6) {
+                                return 'Password must be at least 6 characters.';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+
+                        // Confirm Password (Sign Up only)
+                        if (!_isLogin) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _confirmSecretController,
+                            obscureText: _obscureConfirmSecret,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _submit(),
+                            style: const TextStyle(fontSize: 16),
+                            decoration: _inputDecoration(
+                              hint: 'Confirm Password',
+                              icon: Icons.lock_outline_rounded,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmSecret
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: AppTheme.textSecondary,
+                                ),
+                                tooltip: _obscureConfirmSecret
+                                    ? 'Show password'
+                                    : 'Hide password',
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmSecret =
+                                        !_obscureConfirmSecret;
+                                  });
+                                },
                               ),
                             ),
-                    ),
-                    const SizedBox(height: 16),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please confirm your PIN or password.';
+                              }
+                              if (value.trim() !=
+                                  _secretController.text.trim()) {
+                                return 'Passwords do not match.';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 22),
 
-                    // Mode Toggle Text Button
-                    TextButton(
-                      onPressed: isSubmitting ? null : _switchMode,
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                      child: Text(
-                        _isLogin
-                            ? "Don't have an account? Sign up"
-                            : 'Already have an account? Log in',
-                      ),
+                        // Primary Action Button
+                        FilledButton(
+                          onPressed: isSubmitting ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  _isLogin ? 'Log In' : 'Create Account',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Mode Toggle Footer
+                        Center(
+                          child: TextButton(
+                            onPressed: isSubmitting ? null : _switchMode,
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                            ),
+                            child: Text.rich(
+                              TextSpan(
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppTheme.textSecondary,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: _isLogin
+                                        ? "Don't have an account? "
+                                        : 'Already have an account? ',
+                                  ),
+                                  TextSpan(
+                                    text: _isLogin ? 'Sign Up' : 'Log In',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.primaryGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

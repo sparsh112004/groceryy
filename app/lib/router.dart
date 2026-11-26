@@ -4,6 +4,7 @@ import 'package:pantry_app/features/home/ui/home_screen.dart';
 import 'package:pantry_app/features/household/ui/household_screen.dart';
 import 'package:pantry_app/features/pantry/ui/add_item_screen.dart';
 import 'package:pantry_app/features/pantry/ui/pantry_screen.dart';
+import 'package:pantry_app/features/shopping/ui/purchase_history_screen.dart';
 import 'package:pantry_app/features/shopping/ui/shopping_screen.dart';
 
 /// Navigation state provider managing the bottom tab selection.
@@ -28,6 +29,7 @@ class MainShellScreen extends StatelessWidget {
     HomeScreen(),
     PantryScreen(),
     ShoppingScreen(),
+    PurchaseHistoryScreen(),
     HouseholdScreen(),
   ];
 
@@ -77,6 +79,11 @@ class MainShellScreen extends StatelessWidget {
             icon: Icon(Icons.shopping_cart_outlined),
             selectedIcon: Icon(Icons.shopping_cart),
             label: 'Shopping',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'History',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),

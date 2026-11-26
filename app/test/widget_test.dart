@@ -38,36 +38,40 @@ void main() {
     await tester.pump();
 
     // Verify Welcome header
-    expect(find.text('Welcome to Stockora'), findsOneWidget);
+    expect(find.text('Stockora'), findsOneWidget);
+    expect(find.text('Welcome Back!'), findsOneWidget);
     expect(
-      find.text('Know what is at home, use it before it expires.'),
+      find.text('Login to continue managing your pantry.'),
       findsOneWidget,
     );
 
     // Verify form input fields for login
-    expect(find.text('Phone or email'), findsOneWidget);
-    expect(find.text('PIN or password'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);
+    expect(find.text('Phone or Email'), findsOneWidget);
+    expect(find.text('PIN or Password'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Log In'), findsOneWidget);
 
     // Switch to Sign up mode
-    final signupToggleFinder = find.text("Don't have an account? Sign up");
+    final signupToggleFinder = find.text("Don't have an account? Sign Up", findRichText: true);
     await tester.ensureVisible(signupToggleFinder);
     await tester.tap(signupToggleFinder);
     await tester.pump();
 
-    // Verify Name field appears for Sign up
+    // Verify Name and Confirm Password fields appear for Sign up
+    expect(find.text('Create Your Account'), findsOneWidget);
     expect(find.text('Name'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Sign up'), findsOneWidget);
+    expect(find.text('Confirm Password'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Create Account'), findsOneWidget);
 
     // Switch back to Log in mode
-    final loginToggleFinder = find.text('Already have an account? Log in');
+    final loginToggleFinder =
+        find.text('Already have an account? Log In', findRichText: true);
     await tester.ensureVisible(loginToggleFinder);
     await tester.tap(loginToggleFinder);
     await tester.pump();
 
     // Verify Name field is removed in Log in mode
     expect(find.text('Name'), findsNothing);
-    expect(find.widgetWithText(FilledButton, 'Log in'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Log In'), findsOneWidget);
   });
 
   testWidgets('AddItemScreen renders wireframe elements and enables save on input',
@@ -148,10 +152,10 @@ void main() {
     );
     await tester.pump();
 
-    // Verify Shopping list header and Add to list field
-    expect(find.text('Shopping list'), findsOneWidget);
+    // Verify Shopping List header and Add an item field
+    expect(find.text('Shopping List'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Add to list'), findsOneWidget);
+    expect(find.text('Add an item...'), findsOneWidget);
 
     // Enter text that does not match pantry
     await tester.enterText(find.byType(TextField), 'Bread');

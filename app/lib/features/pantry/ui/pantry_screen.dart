@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pantry_app/app_theme.dart';
+import 'package:pantry_app/core/ui_helpers.dart';
 import 'package:pantry_app/features/pantry/data/item_model.dart';
 import 'package:pantry_app/features/pantry/state/items_provider.dart';
 import 'package:pantry_app/features/pantry/ui/add_item_screen.dart';
 import 'package:pantry_app/features/pantry/ui/item_action_sheet.dart';
 
-/// Pantry inventory screen following Wireframe 3:
-/// - Header: Pantry
-/// - Search field
-/// - Category chips: All + active categories
-/// - Active items sorted by expiry date
-/// - Status pill: Fresh (check), Soon (warning), Expired (cross) (never color alone)
-/// - Tap item row: opens action sheet with mark as used, thrown away, and edit options
+/// Pantry inventory screen with soft sage cards, category chips, and status pills.
 class PantryScreen extends StatefulWidget {
   const PantryScreen({super.key});
 
@@ -31,27 +27,23 @@ class _PantryScreenState extends State<PantryScreen> {
   Widget _buildStatusBadge(ItemModel item) {
     Color textColor;
     Color bgColor;
-    IconData icon;
     String label;
 
     switch (item.expiryStatus) {
       case 'expired':
-        textColor = const Color(0xFFC62828);
-        bgColor = const Color(0xFFFFEBEE);
-        icon = Icons.close_rounded;
+        textColor = AppTheme.statusExpired;
+        bgColor = AppTheme.statusExpiredContainer;
         label = 'Expired';
         break;
       case 'soon':
-        textColor = const Color(0xFFE65100);
-        bgColor = const Color(0xFFFFF3E0);
-        icon = Icons.arrow_drop_up_rounded;
-        label = 'Soon';
+        textColor = AppTheme.statusSoon;
+        bgColor = AppTheme.statusSoonContainer;
+        label = item.daysLeftLabel;
         break;
       case 'fresh':
       default:
-        textColor = const Color(0xFF2E7D32);
-        bgColor = const Color(0xFFE8F5E9);
-        icon = Icons.circle_rounded;
+        textColor = AppTheme.statusFresh;
+        bgColor = AppTheme.statusFreshContainer;
         label = 'Fresh';
         break;
     }
@@ -60,35 +52,45 @@ class _PantryScreenState extends State<PantryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textColor.withValues(alpha: 0.4), width: 1),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: item.expiryStatus == 'fresh' ? 10 : 16,
-            color: textColor,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
       ),
     );
+  }
+
+  String _subtitleForItem(ItemModel item) {
+    final parts = <String>[];
+    if (item.category != null && item.category!.trim().isNotEmpty) {
+      parts.add(item.category!.trim());
+    }
+    if (item.quantity != null) {
+      final qtyStr = item.quantity! % 1 == 0
+          ? item.quantity!.toInt().toString()
+          : item.quantity!.toString();
+      if (item.unit != null && item.unit!.trim().isNotEmpty) {
+        parts.add('$qtyStr ${item.unit!.trim()}');
+      } else {
+        parts.add(qtyStr);
+      }
+    }
+    if (parts.isEmpty) {
+      return 'Expires: ${item.daysLeftLabel}';
+    }
+    return parts.join(' • ');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final itemsProvider = context.watch<ItemsProvider>();
+    final items = itemsProvider.filteredItems;
 
     return Scaffold(
       body: SafeArea(
@@ -97,27 +99,71 @@ class _PantryScreenState extends State<PantryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header & Search Box
+              // Header + Add Item pill + Search Box
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Pantry',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1F2937),
-                      ),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.kitchen_rounded,
+                          color: AppTheme.primaryGreen,
+                          size: 26,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Pantry',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AddItemScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add Item'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    // Search items TextField (Wireframe 3)
                     TextField(
                       controller: _searchController,
                       style: const TextStyle(fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Search items',
-                        prefixIcon: const Icon(Icons.search, size: 22),
+                        hintText: 'Search items...',
+                        hintStyle: const TextStyle(
+                          color: AppTheme.textSecondary,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          size: 22,
+                          color: AppTheme.textSecondary,
+                        ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 20),
@@ -129,17 +175,28 @@ class _PantryScreenState extends State<PantryScreen> {
                             : null,
                         filled: true,
                         fillColor: Colors.white,
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          borderSide: BorderSide(color: Color(0xFFD1D5DB)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppTheme.borderSubtle,
+                          ),
                         ),
-                        enabledBorder: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          borderSide: BorderSide(color: Color(0xFFD1D5DB)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppTheme.borderSubtle,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primaryGreen,
+                            width: 1.5,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
+                          horizontal: 14,
+                          vertical: 12,
                         ),
                       ),
                       onChanged: (val) {
@@ -150,9 +207,9 @@ class _PantryScreenState extends State<PantryScreen> {
                 ),
               ),
 
-              // Category Filter Chips (Wireframe 3: All, Dairy, Grains, Snacks, Spices, etc.)
+              // Category Filter Chips
               SizedBox(
-                height: 44,
+                height: 42,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -161,35 +218,36 @@ class _PantryScreenState extends State<PantryScreen> {
                   itemBuilder: (context, index) {
                     final cat = itemsProvider.categories[index];
                     final isSelected = itemsProvider.selectedCategory == cat;
+                    final chipLabel =
+                        cat == 'All' ? 'All' : '${itemEmoji('', cat)} $cat';
 
-                    return FilterChip(
+                    return ChoiceChip(
                       label: Text(
-                        cat,
+                        chipLabel,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
                           color: isSelected
-                              ? theme.colorScheme.onPrimaryContainer
-                              : const Color(0xFF374151),
+                              ? Colors.white
+                              : AppTheme.textPrimary,
                         ),
                       ),
                       selected: isSelected,
-                      selectedColor: theme.colorScheme.primaryContainer,
+                      selectedColor: AppTheme.primaryGreen,
                       backgroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                         side: BorderSide(
                           color: isSelected
-                              ? theme.colorScheme.primary
-                              : const Color(0xFFD1D5DB),
-                          width: isSelected ? 1.5 : 1.0,
+                              ? AppTheme.primaryGreen
+                              : AppTheme.borderSubtle,
                         ),
                       ),
                       showCheckmark: false,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 10,
+                        vertical: 6,
                       ),
                       onSelected: (_) {
                         itemsProvider.setSelectedCategory(cat);
@@ -198,7 +256,20 @@ class _PantryScreenState extends State<PantryScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
+
+              if (items.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    'Items (${items.length})',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
 
               // Active Items List
               Expanded(
@@ -220,7 +291,7 @@ class _PantryScreenState extends State<PantryScreen> {
                               const Icon(
                                 Icons.error_outline_rounded,
                                 size: 56,
-                                color: Color(0xFFC62828),
+                                color: AppTheme.statusExpired,
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -240,107 +311,142 @@ class _PantryScreenState extends State<PantryScreen> {
                       );
                     }
 
-                    final items = itemsProvider.filteredItems;
-
                     if (items.isEmpty) {
                       final hasFilter =
                           itemsProvider.searchQuery.isNotEmpty ||
                           itemsProvider.selectedCategory != 'All';
 
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
+                      return ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(height: 40),
+                                Icon(
+                                  Icons.kitchen_outlined,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  hasFilter
+                                      ? 'No items match your filter.'
+                                      : 'Your pantry is empty.',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  hasFilter
+                                      ? 'Try clearing the search query or selecting "All".'
+                                      : 'Tap Add Item to add your first grocery item.',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (!hasFilter) ...[
+                                  const SizedBox(height: 24),
+                                  FilledButton.icon(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const AddItemScreen(),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Add your first item'),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                      children: [
+                        Container(
+                          decoration: AppTheme.cardDecoration(),
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.kitchen_outlined,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                hasFilter
-                                    ? 'No items match your filter.'
-                                    : 'Your pantry is empty.',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                hasFilter
-                                    ? 'Try clearing the search query or selecting "All".'
-                                    : 'Tap + to add your first grocery item.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.grey.shade600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              if (!hasFilter) ...[
-                                const SizedBox(height: 24),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const AddItemScreen(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add your first item'),
+                              for (int i = 0; i < items.length; i++) ...[
+                                if (i > 0)
+                                  const Divider(
+                                    height: 1,
+                                    indent: 16,
+                                    endIndent: 16,
+                                    color: AppTheme.borderSubtle,
+                                  ),
+                                InkWell(
+                                  onTap: () => showItemActionSheet(
+                                    context,
+                                    items[i],
+                                    allowEdit: true,
+                                  ),
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        ItemEmojiBadge(
+                                          name: items[i].name,
+                                          category: items[i].category,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                items[i].displayTitle,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.textPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                _subtitleForItem(items[i]),
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppTheme.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        _buildStatusBadge(items[i]),
+                                        const SizedBox(width: 6),
+                                        const Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: AppTheme.textSecondary,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ],
                           ),
                         ),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        color: Color(0xFFE5E7EB),
-                      ),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-
-                        return InkWell(
-                          onTap: () => showItemActionSheet(
-                            context,
-                            item,
-                            allowEdit: true,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14.0,
-                              horizontal: 4.0,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item.displayTitle,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF1F2937),
-                                    ),
-                                  ),
-                                ),
-                                _buildStatusBadge(item),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                      ],
                     );
                   },
                 ),
