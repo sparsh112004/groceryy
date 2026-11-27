@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:pantry_app/core/api_client.dart';
+import 'package:pantry_app/core/notification_service.dart';
 import 'package:pantry_app/features/pantry/data/item_model.dart';
 import 'package:pantry_app/features/pantry/data/items_repository.dart';
 
@@ -137,6 +138,12 @@ class ItemsProvider extends ChangeNotifier {
         }
       }
       _usedBeforeExpiringThisWeekCount = count;
+
+      // Re-schedule daily expiry-summary notifications with fresh data.
+      final reminderItems = _activeItems
+          .map((i) => ReminderItem(name: i.name, expiryDate: i.expiryDate))
+          .toList();
+      NotificationService.instance.scheduleDailySummaries(reminderItems);
 
       _isLoading = false;
       notifyListeners();

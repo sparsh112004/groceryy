@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show Clipboard, ClipboardData, FilteringTextInputFormatter;
@@ -97,11 +97,30 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
     try {
       await NotificationService.instance.init();
       final granted = await NotificationService.instance.requestPermission();
-      if (granted) {
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Notification permission denied')),
+          );
+        }
+        return;
+      }
+
+      // Build a real summary from current pantry items.
+      final itemsProvider = context.read<ItemsProvider>();
+      final activeItems = itemsProvider.activeItems;
+      if (activeItems.isNotEmpty) {
+        final reminderItems = activeItems
+            .map((i) => ReminderItem(name: i.name, expiryDate: i.expiryDate))
+            .toList();
+        await NotificationService.instance.showTestSummaryNotification(reminderItems);
+      } else {
         await NotificationService.instance.showTestNotification();
-      } else if (mounted) {
+      }
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notification permission denied')),
+          const SnackBar(content: Text('Test notification sent!')),
         );
       }
     } finally {
@@ -607,7 +626,7 @@ class _HouseholdScreenBodyState extends State<_HouseholdScreenBody> {
                       const SizedBox(height: 12),
                     ],
 
-                    if (kDebugMode && !kIsWeb) ...[
+                    if (!kIsWeb) ...[ 
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.tonalIcon(

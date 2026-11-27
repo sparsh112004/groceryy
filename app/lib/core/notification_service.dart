@@ -155,6 +155,49 @@ class NotificationService {
     }
   }
 
+  /// Displays an immediate summary notification using the real pantry items.
+  /// Shows expiring-soon and already-expired items just like the daily summary would.
+  Future<void> showTestSummaryNotification(List<ReminderItem> activeItems) async {
+    if (kIsWeb) return;
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final windowEnd = today.add(const Duration(days: 3));
+
+      final expiring = <ReminderItem>[];
+      int expiredCount = 0;
+
+      for (final item in activeItems) {
+        final expiryDay = DateTime(
+          item.expiryDate.year,
+          item.expiryDate.month,
+          item.expiryDate.day,
+        );
+        if (expiryDay.isBefore(today)) {
+          expiredCount++;
+        } else if (!expiryDay.isAfter(windowEnd)) {
+          expiring.add(item);
+        }
+      }
+
+      final String body;
+      if (expiring.isEmpty && expiredCount == 0) {
+        body = 'All ${activeItems.length} items are fresh — no action needed!';
+      } else {
+        body = _buildSummaryBody(expiring, expiredCount);
+      }
+
+      await _plugin.show(
+        _testId,
+        'Use these first',
+        body,
+        _notificationDetails,
+      );
+    } catch (_) {
+      // Never throw on test notification.
+    }
+  }
+
   String _buildSummaryBody(List<ReminderItem> expiring, int expiredCount) {
     final parts = <String>[];
 

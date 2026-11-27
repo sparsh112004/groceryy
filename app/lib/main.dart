@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pantry_app/app_theme.dart';
 import 'package:pantry_app/core/api_client.dart';
+import 'package:pantry_app/core/notification_service.dart';
 import 'package:pantry_app/core/storage.dart';
 import 'package:pantry_app/features/auth/state/auth_provider.dart';
 import 'package:pantry_app/features/auth/ui/auth_screen.dart';
@@ -11,8 +12,11 @@ import 'package:pantry_app/features/shopping/data/shopping_repository.dart';
 import 'package:pantry_app/features/shopping/state/shopping_provider.dart';
 import 'package:pantry_app/router.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialise notification service and request permission at startup.
+  await NotificationService.instance.init();
+  await NotificationService.instance.requestPermission();
   runApp(const PantryApp());
 }
 
